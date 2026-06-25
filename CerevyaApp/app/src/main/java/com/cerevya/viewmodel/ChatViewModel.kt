@@ -4,9 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.cerevya.data.repository.MemoryRepository
+import com.cerevya.domain.ContextManager
 import com.cerevya.domain.Intention
 import com.cerevya.domain.IntentionEngine
 import com.cerevya.domain.MemoryCategorizer
+import com.cerevya.domain.MemorySummarizer
+import com.cerevya.domain.SemanticSearch
 import com.cerevya.domain.models.Message
 import com.cerevya.domain.models.MemoryEntity
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +29,9 @@ class ChatViewModel(private val repository: MemoryRepository) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    // Context manager for conversation context
+    private val contextManager = ContextManager()
 
     fun updateInputText(text: String) {
         _uiState.value = _uiState.value.copy(inputText = text)
@@ -54,33 +60,48 @@ class ChatViewModel(private val repository: MemoryRepository) : ViewModel() {
     }
 
     private suspend fun processUserMessage(text: String) {
-        val intention = IntentionEngine.detectIntention(text)
+        // Get recent context
+        val recentContext = contextManager.getLastUserMessage()
+        
+        // Resolve contextual references
+        val resolvedText = contextManager.resolveContext(text)
+        
+        // Detect intention with context
+        val intention = IntentionEngine.detectIntention(resolvedText, recentContext)
+        
+        // Add user message to context
+        contextManager.addMessage(Message(content = text, isUser = true))
 
         when (intention) {
-            Intention.SAVE_MEMORY -> handleSaveMemory(text)
-            Intention.SEARCH_MEMORY -> handleSearchMemory(text)
+            Intention.SAVE_MEMORY -> handleSaveMemory(resolvedText)
+            Intention.SEARCH_MEMORY -> handleSearchMemory(resolvedText)
             Intention.LIST_MEMORIES -> handleListMemories()
             Intention.NORMAL_CHAT -> handleNormalChat()
         }
     }
 
     private suspend fun handleSaveMemory(text: String) {
-        val content = IntentionEngine.extractMemoryContent(text)
+        // Extract content with context
+        val context = contextManager.getLastUserMessage()
+        val content = IntentionEngine.extractMemoryContent(text, context)
         
         if (content.isNotEmpty()) {
+            // Generate summary
+            val summary = MemorySummarizer.summarize(content)
+            
+            // Categorize
             val category = MemoryCategorizer.categorize(content)
-            val tags = MemoryCategorizer.generateTags(content)
             
             val memory = MemoryEntity(
                 content = content,
                 category = category.displayName,
-                tags = tags.joinToString(",")
+                tags = summary.tags.joinToString(",")
             )
             
             repository.insertMemory(memory)
             
             val successMessage = Message(
-                content = "✅ Memória salva!\n\n📁 Categoria: ${category.displayName}\n🏷️ Tags: ${tags.take(3).joinToString(", ")}",
+                content = "✅ Memória salva!\n\n📝 ${summary.title}\n📁 Categoria: ${category.displayName}\n🏷️ Tags: ${summary.tags.take(3).joinToString(", ")}",
                 isUser = false,
                 memoryId = memory.id
             )
@@ -97,32 +118,33 @@ class ChatViewModel(private val repository: MemoryRepository) : ViewModel() {
         _uiState.value = _uiState.value.copy(isLoading = true)
         
         try {
-            // Extract search query from message
-            val searchQuery = text.lowercase()
-                .replace("me mostra", "")
-                .replace("o que eu", "")
-                .replace("minhas ideias", "")
-                .replace("lembrar", "")
-                .replace("busca", "")
-                .replace("procurar", "")
-                .replace("acha isso", "")
-                .trim()
+            // Extract search query
+            val searchQuery = IntentionEngine.extractSearchQuery(text)
             
-            val memories = if (searchQuery.isNotEmpty()) {
-                repository.searchMemories(searchQuery).first()
-            } else {
-                repository.getAllMemories().first()
-            }
+            // Get all memories for semantic search
+            val allMemories = repository.getAllMemories().first()
             
-            if (memories.isEmpty()) {
+            // Perform semantic search
+            val searchResults = SemanticSearch.search(allMemories, searchQuery)
+            
+            if (searchResults.isEmpty()) {
                 addSystemMessage(Message(
                     content = "🔍 Nenhuma memória encontrada para: \"$searchQuery\"",
                     isUser = false
                 ))
             } else {
-                _uiState.value = _uiState.value.copy(memoryResults = memories)
+                // Get top results
+                val topResults = searchResults.take(5).map { it.memory }
+                _uiState.value = _uiState.value.copy(memoryResults = topResults)
+                
+                val responseText = if (searchResults.size > 5) {
+                    "🔍 Encontrei ${searchResults.size} resultados (mostrando os 5 mais relevantes):"
+                } else {
+                    "🔍 Encontrei ${searchResults.size} memória(s):"
+                }
+                
                 addSystemMessage(Message(
-                    content = "🔍 Encontrei ${memories.size} memória(s):",
+                    content = responseText,
                     isUser = false
                 ))
             }
@@ -148,7 +170,9 @@ class ChatViewModel(private val repository: MemoryRepository) : ViewModel() {
                     isUser = false
                 ))
             } else {
-                _uiState.value = _uiState.value.copy(memoryResults = memories)
+                // Sort by relevance (most recent first for now)
+                val sortedMemories = memories.sortedByDescending { it.createdAt }
+                _uiState.value = _uiState.value.copy(memoryResults = sortedMemories)
                 addSystemMessage(Message(
                     content = "🧠 Você tem ${memories.size} memória(s) salvas:",
                     isUser = false
@@ -170,7 +194,9 @@ class ChatViewModel(private val repository: MemoryRepository) : ViewModel() {
             "💡 Diga 'vou anotar isso: minha ideia' para salvar uma memória.",
             "🔍 Diga 'me mostra minhas ideias' para buscar memórias.",
             "📋 Diga 'minhas memórias' para ver tudo.",
-            "🧠 Estou aqui para ajudar a organizar seus pensamentos!"
+            "🧠 Estou aqui para ajudar a organizar seus pensamentos!",
+            "💭 Pode me contar sobre suas ideias!",
+            "🎯 Como posso ajudar a organizar suas ideias?"
         )
         
         addSystemMessage(Message(
@@ -183,6 +209,8 @@ class ChatViewModel(private val repository: MemoryRepository) : ViewModel() {
         _uiState.value = _uiState.value.copy(
             messages = _uiState.value.messages + message
         )
+        // Add system message to context
+        contextManager.addMessage(message)
     }
 
     class Factory(private val repository: MemoryRepository) : ViewModelProvider.Factory {
