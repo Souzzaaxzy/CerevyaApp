@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "197213311795",
+    "project_id": "cerevya-2299",
+    "storage_bucket": "cerevya-2299.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:197213311795:android:af779c249342e1f9226446",
+        "android_client_info": {
+          "package_name": "com.cerevya"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "197213311795-32hg6uvk0l6bi3urlo27n92et3peekor.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cerevya",
+            "certificate_hash": "b71446a66e2cf2373f50935a9473b0add671df12"
+          }
+        },
+        {
+          "client_id": "197213311795-j212a6dgjeab9fs2ibqhlfortjiqo8rt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD0qfSeX_BMvBerDbpDQOngfxV5e7EWK6w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "197213311795-j212a6dgjeab9fs2ibqhlfortjiqo8rt.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
