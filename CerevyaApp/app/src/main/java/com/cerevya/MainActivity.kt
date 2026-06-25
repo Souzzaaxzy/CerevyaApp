@@ -1,7 +1,9 @@
 package com.cerevya
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,11 +14,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -56,6 +60,22 @@ fun CerevyaAppContent() {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var currentRoute by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+
+    var lastBackPressTime by remember { mutableLongStateOf(0L) }
+    val exitMessage = "Pressione novamente para sair"
+
+    BackHandler(enabled = true) {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastBackPressTime < 2000) {
+            // Second press within 2 seconds - exit
+            (context as? ComponentActivity)?.finish()
+        } else {
+            // First press - show message
+            lastBackPressTime = currentTime
+            Toast.makeText(context, exitMessage, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as CerevyaApplication
 
