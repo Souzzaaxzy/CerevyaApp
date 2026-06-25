@@ -108,7 +108,7 @@ class SettingsViewModel(
                     isLoggedIn = true,
                     userName = firebaseUser?.displayName ?: user?.displayName ?: "",
                     userEmail = firebaseUser?.email ?: user?.email ?: "",
-                    userPhotoUrl = firebaseUser?.photoUrl?.toString() ?: user?.photoUrl
+                    userPhotoUrl = firebaseUser?.photoUrl?.toString() ?: user?.photoUrl ?: ""
                 )
             }
         }

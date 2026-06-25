@@ -20,14 +20,6 @@ import java.io.FileOutputStream
  * FirestoreUserManager - Gerencia dados do usuário no Firebase Firestore
  * 
  * Firestore Collection: users/{uid}
- * 
- * Campos do documento:
- * - uid: String (Firebase Auth UID)
- * - name: String
- * - email: String
- * - photoUrl: String
- * - createdAt: Long (timestamp)
- * - hasCompletedSetup: Boolean
  */
 class FirestoreUserManager(private val context: Context) {
 
@@ -46,9 +38,6 @@ class FirestoreUserManager(private val context: Context) {
 
     private val usersCollection = firestore.collection("users")
 
-    /**
-     * Escuta alterações em tempo real do usuário logado
-     */
     fun observeUser(): Flow<UserEntity?> = callbackFlow {
         val user = auth.currentUser
         if (user == null) {
@@ -71,7 +60,6 @@ class FirestoreUserManager(private val context: Context) {
                 _needsSetup.value = userEntity?.hasCompletedSetup != true
                 trySend(userEntity)
             } else {
-                // Documento não existe, precisa criar
                 _needsSetup.value = true
                 trySend(null)
             }
@@ -80,32 +68,22 @@ class FirestoreUserManager(private val context: Context) {
         awaitClose { listener.remove() }
     }
 
-    /**
-     * Busca usuário do Firestore (uma única vez)
-     */
     suspend fun getUser(): UserEntity? {
         val user = auth.currentUser ?: return null
         
-        try {
+        return try {
             _isLoading.value = true
             val docRef = usersCollection.document(user.uid)
             val snapshot = docRef.get().await()
             
-            return if (snapshot.exists()) {
-                snapshot.toUserEntity()
-            } else {
-                null
-            }
+            if (snapshot.exists()) snapshot.toUserEntity() else null
         } catch (e: Exception) {
-            return null
+            null
         } finally {
             _isLoading.value = false
         }
     }
 
-    /**
-     * Cria documento inicial do usuário no Firestore
-     */
     suspend fun createUserIfNotExists(): UserEntity? {
         val googleUser = auth.currentUser ?: return null
         
@@ -119,8 +97,7 @@ class FirestoreUserManager(private val context: Context) {
                     userId = googleUser.uid,
                     name = googleUser.displayName ?: "",
                     email = googleUser.email ?: "",
-                    photoUrl = googleUser.photoUrl?.toString() ?: "",
-                    createdAt = System.currentTimeMillis(),
+                    photoUrl = googleUser.photoUrl?.toString(),
                     hasCompletedSetup = false,
                     isProfileSetup = false
                 )
@@ -142,23 +119,19 @@ class FirestoreUserManager(private val context: Context) {
         }
     }
 
-    /**
-     * Salva nome de exibição no Firestore
-     */
     suspend fun saveDisplayName(name: String): Boolean {
         val user = auth.currentUser ?: return false
         
         return try {
             val updates = mapOf(
-                "name" to name,
+                "displayName" to name,
                 "hasCompletedSetup" to true,
                 "isProfileSetup" to true
             )
             usersCollection.document(user.uid).update(updates).await()
             
-            // Atualizar cache local
             _currentUser.value = _currentUser.value?.copy(
-                name = name,
+                displayName = name,
                 hasCompletedSetup = true,
                 isProfileSetup = true
             )
@@ -169,27 +142,19 @@ class FirestoreUserManager(private val context: Context) {
         }
     }
 
-    /**
-     * Salva foto de perfil no Firebase Storage e atualiza Firestore
-     */
     suspend fun saveProfilePhoto(uri: Uri): String? {
         val user = auth.currentUser ?: return null
         
         return try {
             _isLoading.value = true
-            
-            // Upload para Firebase Storage
             val photoRef = storage.reference.child("users/${user.uid}/profile_photo.jpg")
             val uploadTask = photoRef.putFile(uri).await()
             val downloadUrl = uploadTask.storage.downloadUrl.await().toString()
             
-            // Atualizar Firestore
             val updates = mapOf("photoUrl" to downloadUrl)
             usersCollection.document(user.uid).update(updates).await()
             
-            // Atualizar cache local
             _currentUser.value = _currentUser.value?.copy(photoUrl = downloadUrl)
-            
             downloadUrl
         } catch (e: Exception) {
             null
@@ -198,9 +163,6 @@ class FirestoreUserManager(private val context: Context) {
         }
     }
 
-    /**
-     * Salva foto de perfil local (copia para app data)
-     */
     suspend fun saveProfilePhotoLocal(uri: Uri): String? {
         return try {
             val userDir = File(context.filesDir, "profile")
@@ -216,99 +178,68 @@ class FirestoreUserManager(private val context: Context) {
             
             val localPath = photoFile.absolutePath
             
-            // Atualizar Firestore com caminho local
             usersCollection.document(auth.currentUser?.uid ?: return null)
                 .update("profilePhotoPath", localPath)
                 .await()
             
             _currentUser.value = _currentUser.value?.copy(profilePhotoPath = localPath)
-            
             localPath
         } catch (e: Exception) {
             null
         }
     }
 
-    /**
-     * Atualiza perfil completo no Firestore
-     */
     suspend fun updateProfile(name: String, photoUrl: String?): Boolean {
         val user = auth.currentUser ?: return false
         
         return try {
             val updates = mutableMapOf<String, Any>(
-                "name" to name
+                "displayName" to name
             )
             photoUrl?.let { updates["photoUrl"] = it }
             
             usersCollection.document(user.uid).update(updates).await()
             
-            // Atualizar cache local
             _currentUser.value = _currentUser.value?.copy(
-                name = name,
-                photoUrl = photoUrl ?: _currentUser.value?.photoUrl ?: ""
+                displayName = name,
+                photoUrl = photoUrl ?: _currentUser.value?.photoUrl
             )
-            
             true
         } catch (e: Exception) {
             false
         }
     }
 
-    /**
-     * Completa setup do perfil
-     */
     suspend fun completeProfileSetup(name: String): Boolean {
         return saveDisplayName(name)
     }
 
-    /**
-     * Verifica se usuário precisa de setup
-     */
     suspend fun checkNeedsSetup(): Boolean {
         val user = getUser()
         return user?.hasCompletedSetup != true
     }
 
-    /**
-     * Desconecta o observer
-     */
     fun disconnect() {
         _currentUser.value = null
         _needsSetup.value = false
     }
 
-    /**
-     * Verifica se há usuário logado
-     */
     fun isLoggedIn(): Boolean = auth.currentUser != null
-
-    /**
-     * Obtém usuário atual do Firebase Auth
-     */
     fun getFirebaseUser() = auth.currentUser
-
-    /**
-     * Logout - apenas remove sessão local, não apaga dados do Firestore
-     */
     fun logout() {
         disconnect()
     }
 }
 
-// Extension functions para conversão
 private fun com.google.firebase.firestore.DocumentSnapshot.toUserEntity(): UserEntity? {
     return try {
         UserEntity(
-            userId = getString("uid") ?: "",
+            userId = getString("userId") ?: "",
             name = getString("name") ?: "",
             email = getString("email") ?: "",
-            photoUrl = getString("photoUrl") ?: "",
+            photoUrl = getString("photoUrl"),
+            displayName = getString("displayName") ?: "",
             profilePhotoPath = getString("profilePhotoPath"),
-            displayName = getString("displayName"),
-            givenName = getString("givenName"),
-            familyName = getString("familyName"),
-            isEmailVerified = getBoolean("isEmailVerified") ?: false,
             createdAt = getLong("createdAt") ?: System.currentTimeMillis(),
             hasCompletedSetup = getBoolean("hasCompletedSetup") ?: false,
             isProfileSetup = getBoolean("isProfileSetup") ?: false
@@ -319,15 +250,12 @@ private fun com.google.firebase.firestore.DocumentSnapshot.toUserEntity(): UserE
 }
 
 private fun UserEntity.toMap(): Map<String, Any?> = mapOf(
-    "uid" to userId,
+    "userId" to userId,
     "name" to name,
     "email" to email,
     "photoUrl" to photoUrl,
-    "profilePhotoPath" to profilePhotoPath,
     "displayName" to displayName,
-    "givenName" to givenName,
-    "familyName" to familyName,
-    "isEmailVerified" to isEmailVerified,
+    "profilePhotoPath" to profilePhotoPath,
     "createdAt" to createdAt,
     "hasCompletedSetup" to hasCompletedSetup,
     "isProfileSetup" to isProfileSetup

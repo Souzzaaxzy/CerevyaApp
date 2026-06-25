@@ -82,7 +82,7 @@ fun ProfileSetupScreen(
     }
     
     // Use Google photo as default if no local photo
-    val effectivePhotoUri = photoUri ?: user.photoUrl?.let { Uri.parse(it) }
+    val effectivePhotoUri = photoUri ?: user?.photoUrl?.let { Uri.parse(it) }
 
     Surface(
         modifier = modifier.fillMaxSize(),

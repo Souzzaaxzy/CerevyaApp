@@ -4,13 +4,14 @@ package com.cerevya.domain.models
  * UserEntity - Modelo de usuário
  */
 data class UserEntity(
-    val userId: String,
-    val name: String = "",           // Nome do Google
+    val userId: String = "",
+    val name: String = "",
     val email: String = "",
-    val photoUrl: String? = null,    // URL do Google
-    val displayName: String = "",    // Nome personalizado chosen by user
-    val profilePhotoPath: String? = null, // Caminho local da foto
-    val isProfileSetup: Boolean = false, // Se o perfil foi configurado
+    val photoUrl: String? = null,
+    val displayName: String = "",
+    val profilePhotoPath: String? = null,
+    val isProfileSetup: Boolean = false,
+    val hasCompletedSetup: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val lastSync: Long = System.currentTimeMillis()
 ) {
