@@ -24,6 +24,18 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v2
 
+      - name: Create Keystore
+        if: vars.KEYSTORE_BASE64 != ''
+        run: echo "$KEYSTORE_BASE64" | base64 -d > CerevyaApp/app/cerevya-keystore.jks
+
+      - name: Create keystore.properties
+        if: vars.KEYSTORE_BASE64 != ''
+        run: |
+          echo "storeFile=app/cerevya-keystore.jks" >> CerevyaApp/keystore.properties
+          echo "storePassword=Cerevya2024!" >> CerevyaApp/keystore.properties
+          echo "keyAlias=cerevya" >> CerevyaApp/keystore.properties
+          echo "keyPassword=Cerevya2024!" >> CerevyaApp/keystore.properties
+
       - name: Cache Gradle packages
         uses: actions/cache@v3
         with:
