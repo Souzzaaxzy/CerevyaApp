@@ -48,6 +48,7 @@ fun NavigationDrawerContent(
     scope: CoroutineScope,
     currentRoute: String?,
     user: UserEntity?,
+    userEmail: String?,
     memoryCount: Int,
     onNavigate: (String) -> Unit,
     onProfileClick: () -> Unit
@@ -174,7 +175,7 @@ private fun ProfileHeader(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = user?.email ?: "Modo offline",
+                    text = userEmail ?: user?.email ?: "Modo offline",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline
                 )

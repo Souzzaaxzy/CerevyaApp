@@ -5,10 +5,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.cerevya.auth.FirebaseAuthManager
+import com.cerevya.data.firestore.FirestoreUserManager
 import com.cerevya.data.preferences.PreferencesManager
 import com.cerevya.data.preferences.ThemeMode
-import com.cerevya.data.profile.ProfileManager
 import com.cerevya.domain.models.UserEntity
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,7 +36,7 @@ data class SettingsUiState(
 class SettingsViewModel(
     private val preferencesManager: PreferencesManager,
     private val authManager: FirebaseAuthManager,
-    private val profileManager: ProfileManager? = null
+    private val firestoreUserManager: FirestoreUserManager? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -48,37 +49,51 @@ class SettingsViewModel(
             }
         }
         
-        viewModelScope.launch {
-            authManager.session.collect { session ->
-                _uiState.update {
-                    it.copy(
-                        isLoggedIn = session.isLoggedIn,
-                        userName = session.user?.name ?: "",
-                        userEmail = session.user?.email ?: "",
-                        userPhotoUrl = session.user?.photoUrl,
-                        isSyncing = session.isSyncing
-                    )
-                }
-            }
-        }
-        
-        // Collect from ProfileManager if available
-        profileManager?.let { pm ->
+        // Collect from FirestoreUserManager if available
+        firestoreUserManager?.let { fm ->
             viewModelScope.launch {
-                pm.userProfile.collect { profile ->
-                    profile?.let {
+                fm.currentUser.collect { user ->
+                    user?.let {
                         _uiState.update { state ->
                             state.copy(
                                 isLoggedIn = true,
                                 userName = it.getEffectiveName(),
-                                userEmail = it.email,
+                                userEmail = FirebaseAuth.getInstance().currentUser?.email ?: it.email,
                                 userPhotoUrl = it.profilePhotoPath ?: it.photoUrl
                             )
+                        }
+                    } ?: run {
+                        // No user in Firestore
+                        val firebaseUser = FirebaseAuth.getInstance().currentUser
+                        if (firebaseUser != null) {
+                            _uiState.update { state ->
+                                state.copy(
+                                    isLoggedIn = true,
+                                    userName = firebaseUser.displayName ?: "",
+                                    userEmail = firebaseUser.email ?: "",
+                                    userPhotoUrl = firebaseUser.photoUrl?.toString()
+                                )
+                            }
                         }
                     }
                 }
             }
         }
+        
+        // Listen to Firebase Auth state changes
+        val authListener = FirebaseAuth.AuthStateListener { auth ->
+            val user = auth.currentUser
+            if (user != null) {
+                _uiState.update { state ->
+                    state.copy(
+                        isLoggedIn = true,
+                        userEmail = user.email ?: state.userEmail,
+                        userPhotoUrl = user.photoUrl?.toString() ?: state.userPhotoUrl
+                    )
+                }
+            }
+        }
+        FirebaseAuth.getInstance().addAuthStateListener(authListener)
         
         // Update initial state
         updateAuthState()
@@ -86,13 +101,14 @@ class SettingsViewModel(
     
     private fun updateAuthState() {
         val user = authManager.getCurrentUser()
-        if (user != null) {
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        if (user != null || firebaseUser != null) {
             _uiState.update {
                 it.copy(
                     isLoggedIn = true,
-                    userName = user.displayName ?: "",
-                    userEmail = user.email ?: "",
-                    userPhotoUrl = user.photoUrl?.toString()
+                    userName = firebaseUser?.displayName ?: user?.displayName ?: "",
+                    userEmail = firebaseUser?.email ?: user?.email ?: "",
+                    userPhotoUrl = firebaseUser?.photoUrl?.toString() ?: user?.photoUrl
                 )
             }
         }
@@ -120,31 +136,8 @@ class SettingsViewModel(
     }
     
     fun signInWithGoogle(activity: Activity) {
+        // Sign-in is handled in MainActivity
         _uiState.update { it.copy(isSigningIn = true, errorMessage = null) }
-        
-        authManager.signInWithGoogle(activity) { result ->
-            result.fold(
-                onSuccess = { user ->
-                    _uiState.update {
-                        it.copy(
-                            isSigningIn = false,
-                            isLoggedIn = true,
-                            userName = user.name,
-                            userEmail = user.email,
-                            userPhotoUrl = user.photoUrl
-                        )
-                    }
-                },
-                onFailure = { error ->
-                    _uiState.update {
-                        it.copy(
-                            isSigningIn = false,
-                            errorMessage = error.message ?: "Erro ao fazer login"
-                        )
-                    }
-                }
-            )
-        }
     }
     
     fun showLogoutDialog() {
@@ -156,10 +149,9 @@ class SettingsViewModel(
     }
     
     fun signOut() {
-        // Clear profile first
-        profileManager?.clearProfile()
-        // Then sign out from Firebase
-        authManager.signOut()
+        // Only disconnect Firestore manager, don't delete data
+        firestoreUserManager?.disconnect()
+        // Sign out from Firebase (caller should handle navigation)
         _uiState.update {
             it.copy(
                 isLoggedIn = false,
@@ -171,32 +163,6 @@ class SettingsViewModel(
         }
     }
     
-    fun handleGoogleSignInResult(data: android.content.Intent?) {
-        authManager.handleGoogleSignInResult(data) { result ->
-            result.fold(
-                onSuccess = { user ->
-                    _uiState.update {
-                        it.copy(
-                            isSigningIn = false,
-                            isLoggedIn = true,
-                            userName = user.name,
-                            userEmail = user.email,
-                            userPhotoUrl = user.photoUrl
-                        )
-                    }
-                },
-                onFailure = { error ->
-                    _uiState.update {
-                        it.copy(
-                            isSigningIn = false,
-                            errorMessage = error.message ?: "Erro ao fazer login"
-                        )
-                    }
-                }
-            )
-        }
-    }
-    
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
     }
@@ -204,11 +170,11 @@ class SettingsViewModel(
     class Factory(
         private val preferencesManager: PreferencesManager,
         private val authManager: FirebaseAuthManager,
-        private val profileManager: ProfileManager? = null
+        private val firestoreUserManager: FirestoreUserManager? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return SettingsViewModel(preferencesManager, authManager, profileManager) as T
+            return SettingsViewModel(preferencesManager, authManager, firestoreUserManager) as T
         }
     }
 }

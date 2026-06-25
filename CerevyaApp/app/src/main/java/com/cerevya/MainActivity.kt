@@ -44,6 +44,7 @@ import com.cerevya.viewmodel.MemoryViewModel
 import com.cerevya.viewmodel.SettingsViewModel
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -51,7 +52,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
-        // Initialize Google Sign-In client with correct WEB_CLIENT_ID
+        // Initialize Google Sign-In client
         val webClientId = "197213311795-j212a6dgjeab9fs2ibqhlfortjiqo8rt.apps.googleusercontent.com"
         val googleSignInClient = GoogleSignIn.getClient(
             this,
@@ -91,15 +92,29 @@ fun CerevyaAppContent(
     
     val app = context.applicationContext as CerevyaApplication
     
-    // Collect profile state
-    val userProfile by app.profileManager.userProfile.collectAsState()
+    // Firebase Auth state
+    val firebaseAuth = FirebaseAuth.getInstance()
+    val currentFirebaseUser by remember { mutableStateOf(firebaseAuth.currentUser) }
+    
+    // Collect Firestore user state
+    val firestoreUser by app.firestoreUserManager.currentUser.collectAsState()
+    val needsSetup by app.firestoreUserManager.needsSetup.collectAsState()
     val memoryCount by app.memoryRepository.getAllMemories().collectAsState(initial = emptyList())
     
     // Auth state
     var isSignInLoading by remember { mutableStateOf(false) }
-    var pendingGoogleUser by remember { mutableStateOf<com.cerevya.domain.models.UserEntity?>(null) }
 
-    // Intercept all back presses for double-back-to-exit
+    // Setup observer para alterações em tempo real do Firestore
+    LaunchedEffect(currentFirebaseUser) {
+        if (currentFirebaseUser != null) {
+            // Criar usuário no Firestore se não existir
+            app.firestoreUserManager.createUserIfNotExists()
+        } else {
+            app.firestoreUserManager.disconnect()
+        }
+    }
+
+    // Intercept back presses
     BackHandler(enabled = currentRoute != Screen.Welcome.route && currentRoute != Screen.ProfileSetup.route) {
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastBackPressTime < 2000) {
@@ -110,7 +125,7 @@ fun CerevyaAppContent(
         }
     }
 
-    // Helper function for clean navigation (no back stack)
+    // Navigate function
     val navigateTo = { route: String ->
         currentRoute = route
         navController.navigate(route) {
@@ -119,11 +134,12 @@ fun CerevyaAppContent(
         }
     }
 
-    // Determine start destination based on auth state
-    val startDestination = remember(userProfile) {
+    // Determine start destination based on Firebase Auth + Firestore
+    val startDestination = remember(currentFirebaseUser, firestoreUser, needsSetup) {
         when {
-            userProfile == null -> Screen.Welcome.route
-            userProfile?.isProfileSetup == false -> Screen.ProfileSetup.route
+            currentFirebaseUser == null -> Screen.Welcome.route
+            firestoreUser == null -> Screen.Welcome.route // Aguardando Firestore
+            needsSetup -> Screen.ProfileSetup.route
             else -> Screen.Chat.route
         }
     }
@@ -133,17 +149,20 @@ fun CerevyaAppContent(
         contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->
         isSignInLoading = false
+        
         app.firebaseAuthManager.handleGoogleSignInResult(result.data) { authResult ->
             authResult.fold(
                 onSuccess = { user ->
-                    // Save basic profile
-                    app.profileManager.saveBasicProfile(user)
-                    
-                    // Check if profile is already setup
-                    if (app.profileManager.isProfileSetup()) {
-                        navigateTo(Screen.Chat.route)
-                    } else {
-                        navigateTo(Screen.ProfileSetup.route)
+                    // Criar documento no Firestore
+                    scope.launch {
+                        app.firestoreUserManager.createUserIfNotExists()
+                        // Redirecionar baseado no setup
+                        val needsSetupNow = app.firestoreUserManager.checkNeedsSetup()
+                        if (needsSetupNow) {
+                            navigateTo(Screen.ProfileSetup.route)
+                        } else {
+                            navigateTo(Screen.Chat.route)
+                        }
                     }
                 },
                 onFailure = { error ->
@@ -160,7 +179,8 @@ fun CerevyaAppContent(
                 drawerState = drawerState,
                 scope = scope,
                 currentRoute = currentRoute,
-                user = userProfile,
+                user = firestoreUser,
+                userEmail = currentFirebaseUser?.email,
                 memoryCount = memoryCount.size,
                 onNavigate = { route ->
                     navigateTo(route)
@@ -175,16 +195,14 @@ fun CerevyaAppContent(
             navController = navController,
             startDestination = startDestination
         ) {
-            // Splash - redirects based on auth state
+            // Splash
             composable(Screen.Splash.route) {
                 SplashScreen(
                     onNavigateToChat = {
-                        if (userProfile?.isProfileSetup == true) {
-                            navigateTo(Screen.Chat.route)
-                        } else if (userProfile != null) {
-                            navigateTo(Screen.ProfileSetup.route)
-                        } else {
-                            navigateTo(Screen.Welcome.route)
+                        when {
+                            currentFirebaseUser == null -> navigateTo(Screen.Welcome.route)
+                            needsSetup -> navigateTo(Screen.ProfileSetup.route)
+                            else -> navigateTo(Screen.Chat.route)
                         }
                     }
                 )
@@ -203,22 +221,25 @@ fun CerevyaAppContent(
 
             // Profile Setup Screen
             composable(Screen.ProfileSetup.route) {
-                val user = userProfile
                 ProfileSetupScreen(
-                    user = user ?: com.cerevya.domain.models.UserEntity(
-                        userId = "",
-                        name = "",
-                        email = ""
-                    ),
+                    user = firestoreUser,
                     onPhotoSelected = { uri ->
-                        app.profileManager.saveProfilePhoto(uri)
+                        scope.launch {
+                            app.firestoreUserManager.saveProfilePhotoLocal(uri)
+                        }
                     },
                     onNameSelected = { name ->
-                        app.profileManager.saveDisplayName(name)
+                        scope.launch {
+                            app.firestoreUserManager.saveDisplayName(name)
+                        }
                     },
                     onComplete = {
-                        app.profileManager.completeProfileSetup()
-                        navigateTo(Screen.Chat.route)
+                        scope.launch {
+                            app.firestoreUserManager.completeProfileSetup(
+                                firestoreUser?.name ?: "Usuário"
+                            )
+                            navigateTo(Screen.Chat.route)
+                        }
                     }
                 )
             }
@@ -272,13 +293,17 @@ fun CerevyaAppContent(
             // Profile Screen
             composable(Screen.Profile.route) {
                 ProfileScreen(
-                    user = userProfile,
+                    user = firestoreUser,
                     memoryCount = memoryCount.size,
                     onPhotoSelected = { uri ->
-                        app.profileManager.saveProfilePhoto(uri)
+                        scope.launch {
+                            app.firestoreUserManager.saveProfilePhotoLocal(uri)
+                        }
                     },
                     onNameUpdated = { name ->
-                        app.profileManager.saveDisplayName(name)
+                        scope.launch {
+                            app.firestoreUserManager.updateProfile(name, null)
+                        }
                     },
                     onBackClick = {
                         navController.popBackStack()
@@ -289,7 +314,11 @@ fun CerevyaAppContent(
             // Settings Screen
             composable(Screen.Settings.route) {
                 val settingsViewModel: SettingsViewModel = viewModel(
-                    factory = SettingsViewModel.Factory(app.preferencesManager, app.firebaseAuthManager, app.profileManager)
+                    factory = SettingsViewModel.Factory(
+                        app.preferencesManager, 
+                        app.firebaseAuthManager, 
+                        app.firestoreUserManager
+                    )
                 )
                 
                 SettingsScreen(
@@ -298,9 +327,10 @@ fun CerevyaAppContent(
                         scope.launch { drawerState.open() }
                     },
                     onSignInClick = {
-                        // Already logged in, no need for sign-in
+                        // Já logado
                     },
                     onLogoutComplete = {
+                        FirebaseAuth.getInstance().signOut()
                         navigateTo(Screen.Welcome.route)
                     }
                 )

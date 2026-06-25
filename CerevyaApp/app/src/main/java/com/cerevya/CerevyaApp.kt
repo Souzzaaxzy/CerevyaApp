@@ -4,8 +4,8 @@ import android.app.Application
 import com.cerevya.auth.FirebaseAuthManager
 import com.cerevya.cloud.CloudMemoryManager
 import com.cerevya.data.database.CerevyaDatabase
+import com.cerevya.data.firestore.FirestoreUserManager
 import com.cerevya.data.preferences.PreferencesManager
-import com.cerevya.data.profile.ProfileManager
 import com.cerevya.data.repository.MemoryRepository
 import com.cerevya.sync.SyncManager
 
@@ -18,8 +18,8 @@ class CerevyaApplication : Application() {
     // Firebase Authentication
     val firebaseAuthManager: FirebaseAuthManager by lazy { FirebaseAuthManager(this) }
     
-    // Profile Manager
-    val profileManager: ProfileManager by lazy { ProfileManager(this) }
+    // Firestore User Manager (única fonte de dados do usuário)
+    val firestoreUserManager: FirestoreUserManager by lazy { FirestoreUserManager(this) }
     
     // Cloud and sync (prepared for when Firebase is fully configured)
     val cloudMemoryManager: CloudMemoryManager by lazy { CloudMemoryManager() }

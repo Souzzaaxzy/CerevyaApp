@@ -49,7 +49,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun ProfileSetupScreen(
-    user: UserEntity,
+    user: UserEntity?,
     onPhotoSelected: suspend (Uri) -> String?,
     onNameSelected: (String) -> Unit,
     onComplete: () -> Unit,
@@ -59,9 +59,13 @@ fun ProfileSetupScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     
-    var displayName by remember { mutableStateOf("") }
+    // Usar dados do Firestore/Google
+    val effectiveUserName = user?.name ?: user?.displayName ?: ""
+    val effectivePhotoUrl = user?.photoUrl ?: user?.profilePhotoPath
+    
+    var displayName by remember(user) { mutableStateOf(effectiveUserName) }
     var photoUri by remember { mutableStateOf<Uri?>(null) }
-    var photoPath by remember { mutableStateOf<String?>(null) }
+    var photoPath by remember(user) { mutableStateOf(effectivePhotoUrl) }
     var nameError by remember { mutableStateOf<String?>(null) }
     
     // Photo picker
