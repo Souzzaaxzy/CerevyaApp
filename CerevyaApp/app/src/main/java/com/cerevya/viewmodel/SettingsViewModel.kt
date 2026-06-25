@@ -82,13 +82,13 @@ class SettingsViewModel(
         
         // Listen to Firebase Auth state changes
         val authListener = FirebaseAuth.AuthStateListener { auth ->
-            val user = auth.currentUser
-            if (user != null) {
+            val fireUser = auth.currentUser
+            if (fireUser != null) {
                 _uiState.update { state ->
                     state.copy(
                         isLoggedIn = true,
-                        userEmail = user.email ?: state.userEmail,
-                        userPhotoUrl = user.photoUrl?.toString() ?: state.userPhotoUrl
+                        userEmail = fireUser.email ?: state.userEmail,
+                        userPhotoUrl = fireUser.photoUrl?.toString() ?: ""
                     )
                 }
             }
@@ -103,15 +103,12 @@ class SettingsViewModel(
         val user = authManager.getCurrentUser()
         val firebaseUser = FirebaseAuth.getInstance().currentUser
         if (user != null || firebaseUser != null) {
-            val userPhotoUrl = user?.photoUrl
-            val firebasePhotoUrl = firebaseUser?.photoUrl?.toString()
-            val photoUrlStr: String = userPhotoUrl ?: firebasePhotoUrl ?: ""
             _uiState.update {
                 it.copy(
                     isLoggedIn = true,
                     userName = firebaseUser?.displayName ?: user?.displayName ?: "",
                     userEmail = firebaseUser?.email ?: user?.email ?: "",
-                    userPhotoUrl = photoUrlStr
+                    userPhotoUrl = ""
                 )
             }
         }
