@@ -52,7 +52,7 @@ fun ProfileSetupScreen(
     user: UserEntity?,
     onPhotoSelected: suspend (Uri) -> Unit,
     onNameSelected: (String) -> Unit,
-    onComplete: () -> Unit,
+    onComplete: (String) -> Unit,
     isLoading: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -212,8 +212,9 @@ fun ProfileSetupScreen(
                     } else if (displayName.length < 2) {
                         nameError = "Nome muito curto"
                     } else {
-                        onNameSelected(displayName.trim())
-                        onComplete()
+                        val finalName = displayName.trim()
+                        onNameSelected(finalName)
+                        onComplete(finalName)
                     }
                 },
                 enabled = !isLoading && displayName.isNotBlank(),

@@ -134,6 +134,12 @@ fun CerevyaAppContent(
         }
     }
 
+    // Navigate back function
+    val navigateBack = {
+        navController.popBackStack()
+        currentRoute = navController.currentDestination?.route ?: Screen.Chat.route
+    }
+
     // Determine start destination based on Firebase Auth + Firestore
     val startDestination = remember(currentFirebaseUser, firestoreUser, needsSetup) {
         when {
@@ -231,11 +237,9 @@ fun CerevyaAppContent(
                             app.firestoreUserManager.saveDisplayName(name)
                         }
                     },
-                    onComplete = {
+                    onComplete = { name ->
                         scope.launch {
-                            app.firestoreUserManager.completeProfileSetup(
-                                firestoreUser?.name ?: "Usuário"
-                            )
+                            app.firestoreUserManager.completeProfileSetup(name)
                             navigateTo(Screen.Chat.route)
                         }
                     }
@@ -302,7 +306,7 @@ fun CerevyaAppContent(
                         }
                     },
                     onBackClick = {
-                        navController.popBackStack()
+                        navigateBack()
                     }
                 )
             }
