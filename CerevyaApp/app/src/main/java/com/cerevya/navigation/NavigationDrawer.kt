@@ -65,6 +65,7 @@ fun NavigationDrawerContent(
             // Profile Header
             ProfileHeader(
                 user = user,
+                userEmail = userEmail,
                 onClick = {
                     scope.launch { drawerState.close() }
                     onProfileClick()
@@ -113,6 +114,7 @@ fun NavigationDrawerContent(
 @Composable
 private fun ProfileHeader(
     user: UserEntity?,
+    userEmail: String?,
     onClick: () -> Unit
 ) {
     Column(
