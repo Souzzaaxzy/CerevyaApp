@@ -16,7 +16,12 @@ data class SettingsUiState(
     val appVersion: String = "1.0.0",
     val appDescription: String = "Seu segundo cérebro digital",
     val currentTheme: ThemeMode = ThemeMode.SYSTEM,
-    val showThemeDialog: Boolean = false
+    val showThemeDialog: Boolean = false,
+    val isLoggedIn: Boolean = false,
+    val userName: String = "",
+    val userEmail: String = "",
+    val isSyncing: Boolean = false,
+    val lastSyncTime: String = "Nunca"
 )
 
 class SettingsViewModel(
