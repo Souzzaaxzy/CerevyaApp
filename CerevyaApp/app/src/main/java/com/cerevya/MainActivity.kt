@@ -38,19 +38,35 @@ import com.cerevya.ui.screens.splash.SplashScreen
 import com.cerevya.viewmodel.ChatViewModel
 import com.cerevya.viewmodel.MemoryViewModel
 import com.cerevya.viewmodel.SettingsViewModel
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Initialize Google Sign-In client reference
+        val googleSignInClient = GoogleSignIn.getClient(
+            this,
+            com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
+                com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN
+            )
+                .requestIdToken("123456789012-abc123def456.apps.googleusercontent.com")
+                .requestEmail()
+                .build()
+        )
+        
         setContent {
             CerevyaTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    CerevyaAppContent()
+                    CerevyaAppContent(
+                        googleSignInClient = googleSignInClient
+                    )
                 }
             }
         }
@@ -58,7 +74,9 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun CerevyaAppContent() {
+fun CerevyaAppContent(
+    googleSignInClient: com.google.android.gms.auth.api.signin.GoogleSignInClient
+) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -67,6 +85,9 @@ fun CerevyaAppContent() {
 
     var lastBackPressTime by remember { mutableLongStateOf(0L) }
     val exitMessage = "Pressione novamente para sair"
+    
+    // State for handling Google Sign-In result
+    var signInResultHandler by remember { mutableStateOf<((android.content.Intent?) -> Unit)?>(null) }
 
     // Intercept all back presses for double-back-to-exit
     BackHandler(enabled = true) {
@@ -166,12 +187,35 @@ fun CerevyaAppContent() {
 
             composable(Screen.Settings.route) {
                 val settingsViewModel: SettingsViewModel = viewModel(
-                    factory = SettingsViewModel.Factory(app.preferencesManager)
+                    factory = SettingsViewModel.Factory(app.preferencesManager, app.firebaseAuthManager)
                 )
+                
+                // Create sign-in launcher for this composable
+                val activity = context as? ComponentActivity
+                val signInLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+                ) { result ->
+                    val data = result.data
+                    // Handle the result
+                    app.firebaseAuthManager.handleGoogleSignInResult(data) { handleResult ->
+                        handleResult.fold(
+                            onSuccess = { user ->
+                                Toast.makeText(context, "Bem-vindo, ${user.name}!", Toast.LENGTH_SHORT).show()
+                            },
+                            onFailure = { error ->
+                                Toast.makeText(context, "Erro no login: ${error.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+                }
+                
                 SettingsScreen(
                     viewModel = settingsViewModel,
                     onMenuClick = {
                         scope.launch { drawerState.open() }
+                    },
+                    onSignInClick = {
+                        signInLauncher.launch(googleSignInClient.signInIntent)
                     }
                 )
             }

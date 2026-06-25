@@ -2,6 +2,7 @@ package com.cerevya.ui.screens.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SettingsBrightness
@@ -43,17 +45,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.cerevya.data.preferences.ThemeMode
+import com.cerevya.ui.components.GoogleSignInButton
 import com.cerevya.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
-    onMenuClick: () -> Unit
+    onMenuClick: () -> Unit,
+    onSignInClick: (() -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
 
     Column(
         modifier = Modifier
@@ -109,28 +119,40 @@ fun SettingsScreen(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Surface(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape),
-                            color = MaterialTheme.colorScheme.primary
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.padding(12.dp)
+                        if (uiState.userPhotoUrl != null) {
+                            AsyncImage(
+                                model = uiState.userPhotoUrl,
+                                contentDescription = "Foto do perfil",
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
                             )
+                        } else {
+                            Surface(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape),
+                                color = MaterialTheme.colorScheme.primary
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            }
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (uiState.isLoggedIn) uiState.userName else "Convidado",
+                                text = if (uiState.isLoggedIn && uiState.userName.isNotEmpty()) 
+                                    uiState.userName else "Convidado",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (uiState.isLoggedIn) uiState.userEmail else "Modo offline",
+                                text = if (uiState.isLoggedIn && uiState.userEmail.isNotEmpty()) 
+                                    uiState.userEmail else "Modo offline",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.outline
                             )
@@ -166,24 +188,50 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.outline
                             )
                         }
-                    } else if (uiState.lastSyncTime.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
+                    }
+                    
+                    // Login/Logout Button
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    if (uiState.isLoggedIn) {
+                        // Logout Button
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.signOut() },
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                            )
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Sync,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.outline
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Última sync: ${uiState.lastSyncTime}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.outline
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Logout,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "Sair da conta",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
+                    } else {
+                        // Login Button
+                        GoogleSignInButton(
+                            text = "Entrar com Google",
+                            loading = uiState.isSigningIn,
+                            onClick = {
+                                onSignInClick?.invoke() ?: activity?.let { viewModel.signInWithGoogle(it) }
+                            }
+                        )
                     }
                 }
             }

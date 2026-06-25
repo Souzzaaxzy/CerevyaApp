@@ -1,7 +1,7 @@
 package com.cerevya.sync
 
 import android.util.Log
-import com.cerevya.auth.AuthManager
+import com.cerevya.auth.FirebaseAuthManager
 import com.cerevya.cloud.CloudMemoryManager
 import com.cerevya.data.repository.MemoryRepository
 import com.cerevya.domain.models.MemoryEntity
@@ -27,7 +27,7 @@ private const val TAG = "SyncManager"
 class SyncManager(
     private val repository: MemoryRepository,
     private val cloudManager: CloudMemoryManager,
-    private val authManager: AuthManager
+    private val authManager: FirebaseAuthManager
 ) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
@@ -109,7 +109,7 @@ class SyncManager(
                     // Agenda delete no cloud
                     removeFromPendingSync(memory.id)
                     scope.launch {
-                        cloudManager.deleteMemory(memory.id, authManager.getCurrentUser()?.userId ?: "")
+                        cloudManager.deleteMemory(memory.id, authManager.getCurrentUser()?.uid ?: "")
                     }
                 }
             } catch (e: Exception) {
@@ -144,7 +144,7 @@ class SyncManager(
             val pending = _pendingSyncs.value
             if (pending.isEmpty()) return@launch
             
-            val userId = authManager.getCurrentUser()?.userId ?: return@launch
+            val userId = authManager.getCurrentUser()?.uid ?: return@launch
             
             for (memory in pending) {
                 val result = cloudManager.syncMemory(memory, userId)
@@ -189,7 +189,7 @@ class SyncManager(
      * Usa estratégia last-write-wins
      */
     private suspend fun fetchFromCloud() {
-        val userId = authManager.getCurrentUser()?.userId ?: return
+        val userId = authManager.getCurrentUser()?.uid ?: return
         
         val result = cloudManager.fetchMemories(userId)
         if (result.isSuccess) {
