@@ -9,6 +9,7 @@ import com.cerevya.domain.models.MemoryEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class ChatUiState(
@@ -22,7 +23,6 @@ class ChatViewModel(private val repository: MemoryRepository) : ViewModel() {
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
-    private val saveCommands = listOf("salva isso", "lembra disso", "guarda isso")
     private val showMemoriesCommand = "mostrar memórias"
 
     fun updateInputText(text: String) {
@@ -90,7 +90,8 @@ class ChatViewModel(private val repository: MemoryRepository) : ViewModel() {
     private suspend fun handleShowMemories() {
         _uiState.value = _uiState.value.copy(isLoading = true)
         
-        repository.getAllMemories().collect { memories ->
+        try {
+            val memories = repository.getAllMemories().first()
             val memoriesList = memories.joinToString("\n") { "• ${it.content}" }
             
             val message = if (memories.isEmpty()) {
@@ -101,6 +102,13 @@ class ChatViewModel(private val repository: MemoryRepository) : ViewModel() {
             
             val systemMessage = Message(content = message, isUser = false)
             addSystemMessage(systemMessage)
+        } catch (e: Exception) {
+            val errorMessage = Message(
+                content = "❌ Erro ao carregar memórias.",
+                isUser = false
+            )
+            addSystemMessage(errorMessage)
+        } finally {
             _uiState.value = _uiState.value.copy(isLoading = false)
         }
     }

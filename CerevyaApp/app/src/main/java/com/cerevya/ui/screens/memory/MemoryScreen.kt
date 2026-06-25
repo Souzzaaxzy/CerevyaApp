@@ -42,6 +42,7 @@ fun MemoryScreen(
     onMenuClick: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val memories by viewModel.memories.collectAsState()
     var memoryToDelete by remember { mutableStateOf<MemoryEntity?>(null) }
 
     Column(
@@ -77,7 +78,7 @@ fun MemoryScreen(
             placeholder = "Pesquisar memórias..."
         )
 
-        if (uiState.memories.isEmpty() && !uiState.isLoading) {
+        if (memories.isEmpty() && !uiState.isLoading) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -99,7 +100,7 @@ fun MemoryScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(vertical = 8.dp)
             ) {
-                items(uiState.memories, key = { it.id }) { memory ->
+                items(memories, key = { it.id }) { memory ->
                     MemoryCard(
                         memory = memory,
                         onEdit = { viewModel.showEditDialog(memory) },

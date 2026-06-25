@@ -23,7 +23,6 @@ fun MessageBubble(
     modifier: Modifier = Modifier
 ) {
     val isUser = message.isUser
-    val alignment = if (isUser) Alignment.End else Alignment.Start
     val backgroundColor = if (isUser) {
         MaterialTheme.colorScheme.primary
     } else {
