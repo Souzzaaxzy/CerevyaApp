@@ -255,6 +255,6 @@ class FirebaseAuthManager(context: Context) {
         private const val RC_SIGN_IN = 9001
         
         // Web Client ID do google-services.json (client_type: 3)
-        private const val WEB_CLIENT_ID = "197213311795-j212a6dgjeab9fs2ibqhlfortjiqo8rt.apps.googleusercontent.com"
+        private const val WEB_CLIENT_ID = "197213311795-9bh76pjnq9pgh69k6ffphvkps6goq3ck.apps.googleusercontent.com"
     }
 }
