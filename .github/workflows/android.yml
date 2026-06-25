@@ -27,7 +27,7 @@ jobs:
       - name: Create Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > CerevyaApp/app/cerevya-keystore.jks
-          echo "storeFile=app/cerevya-keystore.jks" >> CerevyaApp/keystore.properties
+          echo "storeFile=$GITHUB_WORKSPACE/CerevyaApp/app/cerevya-keystore.jks" > CerevyaApp/keystore.properties
           echo "storePassword=Cerevya2024!" >> CerevyaApp/keystore.properties
           echo "keyAlias=cerevya" >> CerevyaApp/keystore.properties
           echo "keyPassword=Cerevya2024!" >> CerevyaApp/keystore.properties
