@@ -3,8 +3,6 @@ name: Android CI/CD
 on:
   push:
     branches: [ main ]
-    tags:
-      - 'v*'
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -36,6 +34,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: Create Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > CerevyaApp/cerevya.keystore.jks
+
       - name: Grant execute permission for gradlew
         run: chmod +x CerevyaApp/gradlew
 
@@ -55,23 +59,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cerevya-release-apk
-          path: CerevyaApp/app/build/outputs/apk/release/app-release-unsigned.apk
-
-      - name: Upload to GitHub Releases
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            CerevyaApp/app/build/outputs/apk/debug/app-debug.apk
-            CerevyaApp/app/build/outputs/apk/release/app-release-unsigned.apk
-          body: |
-            ## Cerevya App - APK Build
-            
-            📦 **Debug APK**: Pronto para instalação em dispositivos de teste
-            🔐 **Release APK**: Versão de produção (unsigned - requer assinatura)
-            
-            Built on: ${{ github.event.head_commit.timestamp }}
-            Commit: ${{ github.sha }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          path: CerevyaApp/app/build/outputs/apk/release/app-release.apk
 

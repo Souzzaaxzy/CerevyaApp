@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Background circle -->
+    <path
+        android:fillColor="#1A1A1A"
+        android:pathData="M54,54m-50,0a50,50 0,1 1,100 0a50,50 0,1 1,-100 0"/>
+    
+    <!-- Brain/Cerevya icon - stylized "C" with dots -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M64,44c0,-11 8,-20 18,-20c3,0 5,2 5,5s-2,5 -5,5c-6,0 -11,5 -11,10c0,5 5,10 11,10c3,0 5,2 5,5s-2,5 -5,5c-10,0 -18,-9 -18,-20z"/>
+    
+    <!-- Neural connection dots -->
+    <path
+        android:fillColor="#808080"
+        android:pathData="M40,40m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0"/>
+    <path
+        android:fillColor="#808080"
+        android:pathData="M48,54m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+    <path
+        android:fillColor="#808080"
+        android:pathData="M40,68m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0"/>
+    
+    <!-- Neural connections -->
+    <path
+        android:strokeColor="#505050"
+        android:strokeWidth="2"
+        android:pathData="M44,40L45,54L44,68"/>
+    
+</vector>

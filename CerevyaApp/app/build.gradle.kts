@@ -22,12 +22,25 @@ android {
     }
 
     buildTypes {
+        debug {
+            isDebuggable = true
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("cerevya.keystore.jks")
+            storePassword = "Cerevya2024!"
+            keyAlias = "cerevya"
+            keyPassword = "Cerevya2024!"
         }
     }
     compileOptions {
