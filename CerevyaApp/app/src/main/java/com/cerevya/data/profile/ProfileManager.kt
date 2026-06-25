@@ -53,7 +53,7 @@ class ProfileManager(private val context: Context) {
             putString(KEY_GOOGLE_NAME, user.name)
             putString(KEY_EMAIL, user.email)
             putString(KEY_GOOGLE_PHOTO, user.photoUrl)
-            if (getLong(KEY_CREATED_AT, 0) == 0L) {
+            if (prefs.getLong(KEY_CREATED_AT, 0) == 0L) {
                 putLong(KEY_CREATED_AT, System.currentTimeMillis())
             }
             apply()
