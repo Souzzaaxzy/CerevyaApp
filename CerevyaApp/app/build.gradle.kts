@@ -38,9 +38,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("cerevya.keystore.jks")
-            storePassword = "Cerevya2024!"
+            storePassword = "582481LL"
             keyAlias = "cerevya"
-            keyPassword = "Cerevya2024!"
+            keyPassword = "582481LL"
         }
     }
     compileOptions {
