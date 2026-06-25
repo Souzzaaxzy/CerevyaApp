@@ -31,18 +31,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
-    signingConfigs {
-        create("release") {
-            storeFile = file("cerevya.keystore.jks")
-            storePassword = "582481LL"
-            keyAlias = "cerevya"
-            keyPassword = "582481LL"
-        }
-    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
