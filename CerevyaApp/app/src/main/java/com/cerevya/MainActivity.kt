@@ -65,19 +65,31 @@ fun CerevyaAppContent() {
     var lastBackPressTime by remember { mutableLongStateOf(0L) }
     val exitMessage = "Pressione novamente para sair"
 
+    // Intercept all back presses for double-back-to-exit
     BackHandler(enabled = true) {
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastBackPressTime < 2000) {
-            // Second press within 2 seconds - exit
+            // Second press within 2 seconds - exit app
             (context as? ComponentActivity)?.finish()
         } else {
-            // First press - show message
+            // First press - show message and reset timer
             lastBackPressTime = currentTime
             Toast.makeText(context, exitMessage, Toast.LENGTH_SHORT).show()
         }
     }
 
-    val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as CerevyaApplication
+    val app = LocalContext.current.applicationContext as CerevyaApplication
+
+    // Helper function for clean navigation (no back stack)
+    val navigateTo = { route: String ->
+        currentRoute = route
+        navController.navigate(route) {
+            // Clear entire back stack - no return to previous screens
+            popUpTo(0) { inclusive = true }
+            // Prevent multiple instances
+            launchSingleTop = true
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -87,10 +99,7 @@ fun CerevyaAppContent() {
                 scope = scope,
                 currentRoute = currentRoute,
                 onNavigate = { route ->
-                    currentRoute = route
-                    navController.navigate(route) {
-                        popUpTo(Screen.Splash.route) { inclusive = true }
-                    }
+                    navigateTo(route)
                 }
             )
         }
@@ -102,10 +111,7 @@ fun CerevyaAppContent() {
             composable(Screen.Splash.route) {
                 SplashScreen(
                     onNavigateToChat = {
-                        currentRoute = Screen.Chat.route
-                        navController.navigate(Screen.Chat.route) {
-                            popUpTo(Screen.Splash.route) { inclusive = true }
-                        }
+                        navigateTo(Screen.Chat.route)
                     }
                 )
             }
@@ -117,9 +123,7 @@ fun CerevyaAppContent() {
                 ChatScreen(
                     viewModel = chatViewModel,
                     onMenuClick = {
-                        scope.launch {
-                            drawerState.open()
-                        }
+                        scope.launch { drawerState.open() }
                     }
                 )
             }
@@ -131,9 +135,7 @@ fun CerevyaAppContent() {
                 MemoryScreen(
                     viewModel = memoryViewModel,
                     onMenuClick = {
-                        scope.launch {
-                            drawerState.open()
-                        }
+                        scope.launch { drawerState.open() }
                     }
                 )
             }
@@ -145,9 +147,7 @@ fun CerevyaAppContent() {
                 SettingsScreen(
                     viewModel = settingsViewModel,
                     onMenuClick = {
-                        scope.launch {
-                            drawerState.open()
-                        }
+                        scope.launch { drawerState.open() }
                     }
                 )
             }
