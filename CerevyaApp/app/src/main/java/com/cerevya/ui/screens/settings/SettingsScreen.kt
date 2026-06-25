@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import java.io.File
 import com.cerevya.data.preferences.ThemeMode
 import com.cerevya.ui.components.GoogleSignInButton
 import com.cerevya.viewmodel.SettingsViewModel
@@ -59,7 +60,8 @@ import com.cerevya.viewmodel.SettingsViewModel
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     onMenuClick: () -> Unit,
-    onSignInClick: (() -> Unit)? = null
+    onSignInClick: (() -> Unit)? = null,
+    onLogoutComplete: (() -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -198,7 +200,10 @@ fun SettingsScreen(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { viewModel.signOut() },
+                                .clickable { 
+                                    viewModel.signOut()
+                                    onLogoutComplete?.invoke()
+                                },
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
                             )

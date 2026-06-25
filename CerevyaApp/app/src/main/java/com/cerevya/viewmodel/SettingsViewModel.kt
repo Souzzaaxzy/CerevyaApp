@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.cerevya.auth.FirebaseAuthManager
 import com.cerevya.data.preferences.PreferencesManager
 import com.cerevya.data.preferences.ThemeMode
+import com.cerevya.data.profile.ProfileManager
+import com.cerevya.domain.models.UserEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,12 +28,14 @@ data class SettingsUiState(
     val isSyncing: Boolean = false,
     val lastSyncTime: String = "Nunca",
     val isSigningIn: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val showLogoutDialog: Boolean = false
 )
 
 class SettingsViewModel(
     private val preferencesManager: PreferencesManager,
-    private val authManager: FirebaseAuthManager
+    private val authManager: FirebaseAuthManager,
+    private val profileManager: ProfileManager? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -54,6 +58,24 @@ class SettingsViewModel(
                         userPhotoUrl = session.user?.photoUrl,
                         isSyncing = session.isSyncing
                     )
+                }
+            }
+        }
+        
+        // Collect from ProfileManager if available
+        profileManager?.let { pm ->
+            viewModelScope.launch {
+                pm.userProfile.collect { profile ->
+                    profile?.let {
+                        _uiState.update { state ->
+                            state.copy(
+                                isLoggedIn = true,
+                                userName = it.getEffectiveName(),
+                                userEmail = it.email,
+                                userPhotoUrl = it.profilePhotoPath ?: it.photoUrl
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -125,14 +147,26 @@ class SettingsViewModel(
         }
     }
     
+    fun showLogoutDialog() {
+        _uiState.update { it.copy(showLogoutDialog = true) }
+    }
+    
+    fun hideLogoutDialog() {
+        _uiState.update { it.copy(showLogoutDialog = false) }
+    }
+    
     fun signOut() {
+        // Clear profile first
+        profileManager?.clearProfile()
+        // Then sign out from Firebase
         authManager.signOut()
         _uiState.update {
             it.copy(
                 isLoggedIn = false,
                 userName = "",
                 userEmail = "",
-                userPhotoUrl = null
+                userPhotoUrl = null,
+                showLogoutDialog = false
             )
         }
     }
@@ -169,11 +203,12 @@ class SettingsViewModel(
 
     class Factory(
         private val preferencesManager: PreferencesManager,
-        private val authManager: FirebaseAuthManager
+        private val authManager: FirebaseAuthManager,
+        private val profileManager: ProfileManager? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return SettingsViewModel(preferencesManager, authManager) as T
+            return SettingsViewModel(preferencesManager, authManager, profileManager) as T
         }
     }
 }
