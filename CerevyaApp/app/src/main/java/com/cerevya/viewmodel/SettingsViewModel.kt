@@ -103,12 +103,14 @@ class SettingsViewModel(
         val user = authManager.getCurrentUser()
         val firebaseUser = FirebaseAuth.getInstance().currentUser
         if (user != null || firebaseUser != null) {
+            val photoUrl: String? = user?.photoUrl ?: firebaseUser?.photoUrl?.toString()
+            val photoUrlStr: String = photoUrl ?: ""
             _uiState.update {
                 it.copy(
                     isLoggedIn = true,
                     userName = firebaseUser?.displayName ?: user?.displayName ?: "",
                     userEmail = firebaseUser?.email ?: user?.email ?: "",
-                    userPhotoUrl = firebaseUser?.photoUrl?.toString() ?: user?.photoUrl ?: ""
+                    userPhotoUrl = photoUrlStr
                 )
             }
         }
