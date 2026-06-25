@@ -19,7 +19,8 @@ data class MemoryUiState(
     val searchQuery: String = "",
     val isLoading: Boolean = false,
     val editingMemory: MemoryEntity? = null,
-    val showEditDialog: Boolean = false
+    val showEditDialog: Boolean = false,
+    val selectedMemory: MemoryEntity? = null
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -65,6 +66,22 @@ class MemoryViewModel(private val repository: MemoryRepository) : ViewModel() {
 
     fun hideEditDialog() {
         _uiState.update { it.copy(editingMemory = null, showEditDialog = false) }
+    }
+
+    fun selectMemory(id: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val memory = repository.getMemoryById(id)
+                _uiState.update { it.copy(selectedMemory = memory, isLoading = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false) }
+            }
+        }
+    }
+
+    fun clearSelection() {
+        _uiState.update { it.copy(selectedMemory = null) }
     }
 
     fun updateMemory(content: String, category: String, tags: String) {

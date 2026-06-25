@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.cerevya.data.repository.MemoryRepository
+import com.cerevya.domain.Intention
+import com.cerevya.domain.IntentionEngine
+import com.cerevya.domain.MemoryCategorizer
 import com.cerevya.domain.models.Message
 import com.cerevya.domain.models.MemoryEntity
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,7 +18,8 @@ import kotlinx.coroutines.launch
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
     val inputText: String = "",
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val memoryResults: List<MemoryEntity> = emptyList()
 )
 
 class ChatViewModel(private val repository: MemoryRepository) : ViewModel() {
@@ -23,10 +27,12 @@ class ChatViewModel(private val repository: MemoryRepository) : ViewModel() {
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
-    private val showMemoriesCommand = "mostrar memórias"
-
     fun updateInputText(text: String) {
         _uiState.value = _uiState.value.copy(inputText = text)
+    }
+
+    fun clearMemoryResults() {
+        _uiState.value = _uiState.value.copy(memoryResults = emptyList())
     }
 
     fun sendMessage() {
@@ -38,7 +44,8 @@ class ChatViewModel(private val repository: MemoryRepository) : ViewModel() {
         
         _uiState.value = _uiState.value.copy(
             messages = currentMessages,
-            inputText = ""
+            inputText = "",
+            memoryResults = emptyList()
         )
 
         viewModelScope.launch {
@@ -47,70 +54,129 @@ class ChatViewModel(private val repository: MemoryRepository) : ViewModel() {
     }
 
     private suspend fun processUserMessage(text: String) {
-        val lowerText = text.lowercase()
+        val intention = IntentionEngine.detectIntention(text)
 
-        when {
-            lowerText.startsWith("salva isso") -> handleSaveMemory(text)
-            lowerText.startsWith("lembra disso") -> handleSaveMemory(text, "lembra disso")
-            lowerText.startsWith("guarda isso") -> handleSaveMemory(text, "guarda isso")
-            lowerText == showMemoriesCommand -> handleShowMemories()
-            else -> {
-                val systemMessage = Message(
-                    content = "Olá! Sou o Cerevya, seu segundo cérebro digital. \n\n" +
-                            "Diga 'salva isso: [sua ideia]' para salvar uma memória.\n" +
-                            "Diga 'mostrar memórias' para ver suas memórias.",
-                    isUser = false
-                )
-                addSystemMessage(systemMessage)
-            }
+        when (intention) {
+            Intention.SAVE_MEMORY -> handleSaveMemory(text)
+            Intention.SEARCH_MEMORY -> handleSearchMemory(text)
+            Intention.LIST_MEMORIES -> handleListMemories()
+            Intention.NORMAL_CHAT -> handleNormalChat()
         }
     }
 
-    private suspend fun handleSaveMemory(text: String, command: String = "salva isso") {
-        val content = text.removePrefix(command).removePrefix(":").removePrefix(" ").trim()
+    private suspend fun handleSaveMemory(text: String) {
+        val content = IntentionEngine.extractMemoryContent(text)
         
         if (content.isNotEmpty()) {
-            val memory = MemoryEntity(content = content)
+            val category = MemoryCategorizer.categorize(content)
+            val tags = MemoryCategorizer.generateTags(content)
+            
+            val memory = MemoryEntity(
+                content = content,
+                category = category.displayName,
+                tags = tags.joinToString(",")
+            )
+            
             repository.insertMemory(memory)
             
             val successMessage = Message(
-                content = "✅ Memória salva com sucesso!",
-                isUser = false
+                content = "✅ Memória salva!\n\n📁 Categoria: ${category.displayName}\n🏷️ Tags: ${tags.take(3).joinToString(", ")}",
+                isUser = false,
+                memoryId = memory.id
             )
             addSystemMessage(successMessage)
         } else {
-            val errorMessage = Message(
-                content = "Por favor, forneça o conteúdo para salvar. Ex: 'salva isso: minha ideia'",
+            addSystemMessage(Message(
+                content = "🤔 Não consegui identificar o conteúdo para salvar. Tente: 'salva isso: sua ideia'",
                 isUser = false
-            )
-            addSystemMessage(errorMessage)
+            ))
         }
     }
 
-    private suspend fun handleShowMemories() {
+    private suspend fun handleSearchMemory(text: String) {
+        _uiState.value = _uiState.value.copy(isLoading = true)
+        
+        try {
+            // Extract search query from message
+            val searchQuery = text.lowercase()
+                .replace("me mostra", "")
+                .replace("o que eu", "")
+                .replace("minhas ideias", "")
+                .replace("lembrar", "")
+                .replace("busca", "")
+                .replace("procurar", "")
+                .replace("acha isso", "")
+                .trim()
+            
+            val memories = if (searchQuery.isNotEmpty()) {
+                repository.searchMemories(searchQuery).first()
+            } else {
+                repository.getAllMemories().first()
+            }
+            
+            if (memories.isEmpty()) {
+                addSystemMessage(Message(
+                    content = "🔍 Nenhuma memória encontrada para: \"$searchQuery\"",
+                    isUser = false
+                ))
+            } else {
+                _uiState.value = _uiState.value.copy(memoryResults = memories)
+                addSystemMessage(Message(
+                    content = "🔍 Encontrei ${memories.size} memória(s):",
+                    isUser = false
+                ))
+            }
+        } catch (e: Exception) {
+            addSystemMessage(Message(
+                content = "❌ Erro ao buscar memórias.",
+                isUser = false
+            ))
+        } finally {
+            _uiState.value = _uiState.value.copy(isLoading = false)
+        }
+    }
+
+    private suspend fun handleListMemories() {
         _uiState.value = _uiState.value.copy(isLoading = true)
         
         try {
             val memories = repository.getAllMemories().first()
-            val memoriesList = memories.joinToString("\n") { "• ${it.content}" }
             
-            val message = if (memories.isEmpty()) {
-                "📝 Nenhuma memória encontrada. Comece salvando algo!"
+            if (memories.isEmpty()) {
+                addSystemMessage(Message(
+                    content = "📝 Nenhuma memória ainda.\n\nDiga 'vou anotar isso: sua ideia' para criar a primeira!",
+                    isUser = false
+                ))
             } else {
-                "🧠 Minhas memórias:\n\n$memoriesList"
+                _uiState.value = _uiState.value.copy(memoryResults = memories)
+                addSystemMessage(Message(
+                    content = "🧠 Você tem ${memories.size} memória(s) salvas:",
+                    isUser = false
+                ))
             }
-            
-            val systemMessage = Message(content = message, isUser = false)
-            addSystemMessage(systemMessage)
         } catch (e: Exception) {
-            val errorMessage = Message(
+            addSystemMessage(Message(
                 content = "❌ Erro ao carregar memórias.",
                 isUser = false
-            )
-            addSystemMessage(errorMessage)
+            ))
         } finally {
             _uiState.value = _uiState.value.copy(isLoading = false)
         }
+    }
+
+    private fun handleNormalChat() {
+        val responses = listOf(
+            "👋 Olá! Sou o Cerevya, seu segundo cérebro digital.",
+            "💡 Diga 'vou anotar isso: minha ideia' para salvar uma memória.",
+            "🔍 Diga 'me mostra minhas ideias' para buscar memórias.",
+            "📋 Diga 'minhas memórias' para ver tudo.",
+            "🧠 Estou aqui para ajudar a organizar seus pensamentos!"
+        )
+        
+        addSystemMessage(Message(
+            content = responses.random(),
+            isUser = false
+        ))
     }
 
     private fun addSystemMessage(message: Message) {

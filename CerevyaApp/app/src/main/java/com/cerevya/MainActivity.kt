@@ -13,6 +13,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -22,8 +23,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import androidx.navigation.compose.rememberNavController
 import com.cerevya.navigation.NavigationDrawerContent
 import com.cerevya.navigation.Screen
@@ -124,14 +127,35 @@ fun CerevyaAppContent() {
                     viewModel = chatViewModel,
                     onMenuClick = {
                         scope.launch { drawerState.open() }
+                    },
+                    onMemoryClick = { memoryId ->
+                        navigateTo("${Screen.Memory.route}?id=$memoryId")
                     }
                 )
             }
 
-            composable(Screen.Memory.route) {
+            composable(
+                route = Screen.Memory.route + "?id={id}",
+                arguments = listOf(
+                    navArgument("id") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
+            ) { backStackEntry ->
+                val memoryId = backStackEntry.arguments?.getString("id")
                 val memoryViewModel: MemoryViewModel = viewModel(
                     factory = MemoryViewModel.Factory(app.memoryRepository)
                 )
+                
+                // Select memory if ID provided
+                LaunchedEffect(memoryId) {
+                    memoryId?.let { id ->
+                        memoryViewModel.selectMemory(id)
+                    }
+                }
+                
                 MemoryScreen(
                     viewModel = memoryViewModel,
                     onMenuClick = {

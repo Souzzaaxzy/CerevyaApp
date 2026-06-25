@@ -2,7 +2,6 @@ package com.cerevya.ui.screens.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,13 +39,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.cerevya.ui.components.MessageBubble
+import com.cerevya.ui.components.MemoryPreviewCard
 import com.cerevya.viewmodel.ChatViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     viewModel: ChatViewModel,
-    onMenuClick: () -> Unit
+    onMenuClick: () -> Unit,
+    onMemoryClick: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
@@ -93,6 +95,40 @@ fun ChatScreen(
         ) {
             items(uiState.messages, key = { it.id }) { message ->
                 MessageBubble(message = message)
+            }
+            
+            // Show memory results as preview cards
+            if (uiState.memoryResults.isNotEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        uiState.memoryResults.forEach { memory ->
+                            MemoryPreviewCard(
+                                memory = memory,
+                                onClick = { onMemoryClick(memory.id) }
+                            )
+                        }
+                    }
+                }
+            }
+            
+            // Loading indicator
+            if (uiState.isLoading) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                }
             }
         }
 

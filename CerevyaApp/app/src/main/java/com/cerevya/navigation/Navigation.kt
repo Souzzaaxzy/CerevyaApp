@@ -5,4 +5,8 @@ sealed class Screen(val route: String) {
     data object Chat : Screen("chat")
     data object Memory : Screen("memory")
     data object Settings : Screen("settings")
+    
+    companion object {
+        fun memoryWithId(id: String) = "memory?id=$id"
+    }
 }
