@@ -13,20 +13,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -35,10 +29,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.cerevya.ui.components.MessageBubble
+import com.cerevya.ui.components.chat.MessageBubble
 import com.cerevya.ui.components.MemoryPreviewCard
 import com.cerevya.viewmodel.ChatViewModel
 
@@ -52,6 +44,7 @@ fun ChatScreen(
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
 
+    // Auto scroll to bottom when new messages arrive
     LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
             listState.animateScrollToItem(uiState.messages.size - 1)
@@ -86,6 +79,7 @@ fun ChatScreen(
             )
         )
 
+        // Messages list
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
@@ -93,11 +87,14 @@ fun ChatScreen(
             state = listState,
             contentPadding = PaddingValues(vertical = 8.dp)
         ) {
-            items(uiState.messages, key = { it.id }) { message ->
+            items(
+                items = uiState.messages,
+                key = { it.messageId }
+            ) { message ->
                 MessageBubble(message = message)
             }
             
-            // Show memory results as preview cards
+            // Memory results as cards
             if (uiState.memoryResults.isNotEmpty()) {
                 item {
                     Column(
@@ -132,81 +129,12 @@ fun ChatScreen(
             }
         }
 
-        ChatInput(
+        // Chat input
+        com.cerevya.ui.components.chat.ChatInput(
             text = uiState.inputText,
             onTextChange = viewModel::updateInputText,
-            onSendClick = viewModel::sendMessage
+            onSendClick = viewModel::sendMessage,
+            enabled = !uiState.isLoading
         )
-    }
-}
-
-@Composable
-private fun ChatInput(
-    text: String,
-    onTextChange: (String) -> Unit,
-    onSendClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        IconButton(
-            onClick = { },
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Icon(
-                imageVector = Icons.Default.AttachFile,
-                contentDescription = "Anexo",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        TextField(
-            value = text,
-            onValueChange = onTextChange,
-            modifier = Modifier.weight(1f),
-            placeholder = {
-                Text(
-                    text = "Digite sua mensagem...",
-                    color = MaterialTheme.colorScheme.outline
-                )
-            },
-            shape = RoundedCornerShape(24.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent
-            ),
-            singleLine = false,
-            maxLines = 4
-        )
-
-        IconButton(
-            onClick = onSendClick,
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(
-                    if (text.isNotBlank()) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.surfaceVariant
-                )
-        ) {
-            Icon(
-                imageVector = Icons.Default.Send,
-                contentDescription = "Enviar",
-                tint = if (text.isNotBlank()) MaterialTheme.colorScheme.onPrimary
-                else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
     }
 }

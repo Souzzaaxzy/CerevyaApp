@@ -247,7 +247,7 @@ fun CerevyaAppContent(
             // Chat Screen
             composable(Screen.Chat.route) {
                 val chatViewModel: ChatViewModel = viewModel(
-                    factory = ChatViewModel.Factory(app.memoryRepository)
+                    factory = ChatViewModel.Factory(app.memoryRepository, app.chatManager)
                 )
                 ChatScreen(
                     viewModel = chatViewModel,
