@@ -119,7 +119,9 @@ fun CerevyaAppContent() {
             }
 
             composable(Screen.Settings.route) {
-                val settingsViewModel: SettingsViewModel = viewModel()
+                val settingsViewModel: SettingsViewModel = viewModel(
+                    factory = SettingsViewModel.Factory(app.preferencesManager)
+                )
                 SettingsScreen(
                     viewModel = settingsViewModel,
                     onMenuClick = {
