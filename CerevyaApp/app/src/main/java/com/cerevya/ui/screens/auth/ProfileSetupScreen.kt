@@ -50,7 +50,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ProfileSetupScreen(
     user: UserEntity?,
-    onPhotoSelected: suspend (Uri) -> String?,
+    onPhotoSelected: suspend (Uri) -> Unit,
     onNameSelected: (String) -> Unit,
     onComplete: () -> Unit,
     isLoading: Boolean = false,
@@ -76,7 +76,7 @@ fun ProfileSetupScreen(
             photoUri = it
             // Save photo and get path
             scope.launch {
-                photoPath = onPhotoSelected(it)
+                onPhotoSelected(it)
             }
         }
     }

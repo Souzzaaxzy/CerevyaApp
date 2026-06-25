@@ -224,10 +224,7 @@ fun CerevyaAppContent(
                 ProfileSetupScreen(
                     user = firestoreUser,
                     onPhotoSelected = { uri ->
-                        scope.launch {
-                            app.firestoreUserManager.saveProfilePhotoLocal(uri)
-                        }
-                        Unit
+                        app.firestoreUserManager.saveProfilePhotoLocal(uri)
                     },
                     onNameSelected = { name ->
                         scope.launch {
@@ -297,10 +294,7 @@ fun CerevyaAppContent(
                     user = firestoreUser,
                     memoryCount = memoryCount.size,
                     onPhotoSelected = { uri ->
-                        scope.launch {
-                            app.firestoreUserManager.saveProfilePhotoLocal(uri)
-                        }
-                        Unit
+                        app.firestoreUserManager.saveProfilePhotoLocal(uri)
                     },
                     onNameUpdated = { name ->
                         scope.launch {

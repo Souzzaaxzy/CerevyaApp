@@ -77,7 +77,7 @@ import java.util.Locale
 fun ProfileScreen(
     user: UserEntity?,
     memoryCount: Int,
-    onPhotoSelected: suspend (Uri) -> String?,
+    onPhotoSelected: suspend (Uri) -> Unit,
     onNameUpdated: (String) -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
