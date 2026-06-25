@@ -9,9 +9,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,7 +43,11 @@ import androidx.compose.ui.unit.dp
 import com.cerevya.domain.models.MemoryEntity
 import com.cerevya.ui.components.MemoryCard
 import com.cerevya.ui.components.SearchBar
+import com.cerevya.ui.components.TagChip
 import com.cerevya.viewmodel.MemoryViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,6 +125,22 @@ fun MemoryScreen(
         }
     }
 
+    // Show selected memory detail
+    uiState.selectedMemory?.let { memory ->
+        MemoryDetailDialog(
+            memory = memory,
+            onDismiss = { viewModel.clearSelection() },
+            onEdit = {
+                viewModel.clearSelection()
+                viewModel.showEditDialog(memory)
+            },
+            onDelete = {
+                viewModel.clearSelection()
+                memoryToDelete = memory
+            }
+        )
+    }
+
     if (uiState.showEditDialog && uiState.editingMemory != null) {
         EditMemoryDialog(
             memory = uiState.editingMemory!!,
@@ -130,6 +160,85 @@ fun MemoryScreen(
             onDismiss = { memoryToDelete = null }
         )
     }
+}
+
+@Composable
+fun MemoryDetailDialog(
+    memory: MemoryEntity,
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Text(
+                    text = memory.category,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = memory.content,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                if (memory.tags.isNotEmpty()) {
+                    Divider(modifier = Modifier.padding(vertical = 12.dp))
+                    
+                    Text(
+                        text = "Tags",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    
+                    Column(modifier = Modifier.padding(top = 8.dp)) {
+                        memory.tags.split(",").forEach { tag ->
+                            TagChip(tag = tag.trim())
+                        }
+                    }
+                }
+                
+                Divider(modifier = Modifier.padding(vertical = 12.dp))
+                
+                Text(
+                    text = "Criado: ${formatDateTime(memory.createdAt)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                
+                if (memory.updatedAt != memory.createdAt) {
+                    Text(
+                        text = "Atualizado: ${formatDateTime(memory.updatedAt)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Fechar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onEdit) {
+                Icon(Icons.Default.Edit, contentDescription = null)
+                Text("Editar")
+            }
+            TextButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                Text("Excluir", color = MaterialTheme.colorScheme.error)
+            }
+        }
+    )
 }
 
 @Composable
@@ -222,4 +331,9 @@ private fun DeleteConfirmationDialog(
             }
         }
     )
+}
+
+private fun formatDateTime(timestamp: Long): String {
+    val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+    return sdf.format(Date(timestamp))
 }
