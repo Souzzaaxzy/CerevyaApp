@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -181,8 +180,7 @@ fun ChatScreen(
 private fun WelcomeScreen() {
     Box(
         modifier = Modifier
-            .weight(1f)
-            .fillMaxWidth(),
+            .fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Column(
