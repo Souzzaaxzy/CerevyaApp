@@ -80,7 +80,7 @@ fun NavigationDrawerContent(
             // Navigation Items
             DrawerMenuItem.entries.forEach { item ->
                 val route = when (item) {
-                    DrawerMenuItem.CHAT -> Screen.Chat.route
+                    DrawerMenuItem.CHAT -> Screen.ChatList.route
                     DrawerMenuItem.MEMORIES -> Screen.Memory.route
                     DrawerMenuItem.SETTINGS -> Screen.Settings.route
                 }

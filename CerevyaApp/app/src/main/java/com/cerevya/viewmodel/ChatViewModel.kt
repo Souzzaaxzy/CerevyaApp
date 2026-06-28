@@ -1,9 +1,9 @@
 package com.cerevya.viewmodel
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.cerevya.data.chat.ChatEntity
 import com.cerevya.data.chat.ChatManager
 import com.cerevya.data.chat.MessageEntity
 import com.cerevya.data.chat.MessageRole
@@ -27,7 +27,8 @@ data class ChatUiState(
     val inputText: String = "",
     val isLoading: Boolean = false,
     val memoryResults: List<MemoryEntity> = emptyList(),
-    val error: String? = null
+    val error: String? = null,
+    val chatTitle: String? = null
 )
 
 class ChatViewModel(
@@ -40,11 +41,54 @@ class ChatViewModel(
 
     private val contextManager = ContextManager()
 
+    // Chat ativo atual
+    private var currentChatId: String? = null
+
     init {
-        // Observar mensagens em tempo real do Firestore
+        // Observar chat ativo
         viewModelScope.launch {
-            chatManager.observeMessages().collect { messages ->
+            chatManager.activeChat.collect { chat ->
+                chat?.let {
+                    currentChatId = it.chatId
+                    _uiState.value = _uiState.value.copy(chatTitle = it.title)
+                }
+            }
+        }
+        
+        // Observar mensagens do chat ativo
+        viewModelScope.launch {
+            chatManager.messages.collect { messages ->
                 _uiState.value = _uiState.value.copy(messages = messages)
+            }
+        }
+    }
+
+    /**
+     * Carrega as mensagens de um chat específico
+     */
+    fun loadChat(chatId: String) {
+        currentChatId = chatId
+        viewModelScope.launch {
+            chatManager.setActiveChat(chatId)
+            // Iniciar observação de mensagens
+            chatManager.observeMessages(chatId).collect { messages ->
+                _uiState.value = _uiState.value.copy(messages = messages)
+            }
+        }
+    }
+
+    /**
+     * Cria um novo chat vazio
+     */
+    fun createNewChat() {
+        viewModelScope.launch {
+            val chat = chatManager.createChat()
+            chat?.let {
+                currentChatId = it.chatId
+                _uiState.value = _uiState.value.copy(
+                    messages = emptyList(),
+                    chatTitle = it.title
+                )
             }
         }
     }
@@ -200,7 +244,7 @@ class ChatViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        chatManager.clearMessages()
+        // Não limpa as mensagens aqui para manter o chat preservado
     }
 
     class Factory(

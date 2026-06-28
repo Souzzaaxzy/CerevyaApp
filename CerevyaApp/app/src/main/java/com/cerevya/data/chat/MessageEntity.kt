@@ -3,7 +3,7 @@ package com.cerevya.data.chat
 /**
  * MessageEntity - Modelo de mensagem para o chat
  * 
- * Estrutura Firestore: messages/{messageId}
+ * Estrutura Firestore: chats/{chatId}/messages/{messageId}
  * 
  * Roles:
  * - user: Mensagem enviada pelo usuário

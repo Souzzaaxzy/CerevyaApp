@@ -34,6 +34,7 @@ import com.cerevya.navigation.Screen
 import com.cerevya.theme.CerevyaTheme
 import com.cerevya.ui.screens.auth.ProfileSetupScreen
 import com.cerevya.ui.screens.auth.WelcomeScreen
+import com.cerevya.ui.screens.chat.ChatListScreen
 import com.cerevya.ui.screens.chat.ChatScreen
 import com.cerevya.ui.screens.memory.MemoryScreen
 import com.cerevya.ui.screens.profile.ProfileScreen
@@ -101,6 +102,10 @@ fun CerevyaAppContent(
     val needsSetup by app.firestoreUserManager.needsSetup.collectAsState()
     val memoryCount by app.memoryRepository.getAllMemories().collectAsState(initial = emptyList())
     
+    // Collect chats state
+    val chats by app.chatManager.chats.collectAsState()
+    val activeChat by app.chatManager.activeChat.collectAsState()
+    
     // Auth state
     var isSignInLoading by remember { mutableStateOf(false) }
 
@@ -109,24 +114,66 @@ fun CerevyaAppContent(
         if (currentFirebaseUser != null) {
             // Criar usuário no Firestore se não existir
             app.firestoreUserManager.createUserIfNotExists()
+            // Iniciar observação de chats
+            app.chatManager.observeChats()
         } else {
             app.firestoreUserManager.disconnect()
+            app.chatManager.clearMessages()
         }
     }
 
-    // Intercept back presses
+    // Intercept back presses - proper app navigation
     BackHandler(enabled = currentRoute != Screen.Welcome.route && currentRoute != Screen.ProfileSetup.route) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastBackPressTime < 2000) {
-            (context as? ComponentActivity)?.finish()
+        val canPop = navController.previousBackStackEntry != null
+        if (canPop) {
+            navController.popBackStack()
+            currentRoute = navController.currentDestination?.route
         } else {
-            lastBackPressTime = currentTime
-            Toast.makeText(context, exitMessage, Toast.LENGTH_SHORT).show()
+            // At root, exit app
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastBackPressTime < 2000) {
+                (context as? ComponentActivity)?.finish()
+            } else {
+                lastBackPressTime = currentTime
+                Toast.makeText(context, exitMessage, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
-    // Navigate function
+    // Navigate function - preserves backstack like a proper app
     val navigateTo = { route: String ->
+        if (currentRoute != route) {
+            currentRoute = route
+            navController.navigate(route) {
+                // Don't pop everything, just avoid duplicate destinations
+                popUpTo(Screen.ChatList.route) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+
+    // Navigate to chat with specific chatId
+    val navigateToChat = { chatId: String ->
+        currentRoute = Screen.Chat.route
+        navController.navigate(Screen.Chat.route) {
+            popUpTo(Screen.ChatList.route) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    // Navigate back function - proper app navigation
+    val navigateBack = {
+        val canPop = navController.previousBackStackEntry != null
+        if (canPop) {
+            navController.popBackStack()
+            currentRoute = navController.currentDestination?.route ?: Screen.ChatList.route
+        }
+    }
+
+    // Navigate and clear backstack (for auth flows)
+    val navigateAndClearBackstack = { route: String ->
         currentRoute = route
         navController.navigate(route) {
             popUpTo(0) { inclusive = true }
@@ -134,10 +181,14 @@ fun CerevyaAppContent(
         }
     }
 
-    // Navigate back function
-    val navigateBack = {
-        navController.popBackStack()
-        currentRoute = navController.currentDestination?.route ?: Screen.Chat.route
+    // Create new chat and navigate
+    val createNewChat = {
+        scope.launch {
+            val chat = app.chatManager.createChat()
+            chat?.let {
+                navigateToChat(it.chatId)
+            }
+        }
     }
 
     // Determine start destination based on Firebase Auth + Firestore
@@ -146,7 +197,7 @@ fun CerevyaAppContent(
             currentFirebaseUser == null -> Screen.Welcome.route
             firestoreUser == null -> Screen.Welcome.route // Aguardando Firestore
             needsSetup -> Screen.ProfileSetup.route
-            else -> Screen.Chat.route
+            else -> Screen.ChatList.route
         }
     }
 
@@ -162,12 +213,12 @@ fun CerevyaAppContent(
                     // Criar documento no Firestore
                     scope.launch {
                         app.firestoreUserManager.createUserIfNotExists()
-                        // Redirecionar baseado no setup
+                        // Redirecionar baseado no setup - clear backstack for auth flows
                         val needsSetupNow = app.firestoreUserManager.checkNeedsSetup()
                         if (needsSetupNow) {
-                            navigateTo(Screen.ProfileSetup.route)
+                            navigateAndClearBackstack(Screen.ProfileSetup.route)
                         } else {
-                            navigateTo(Screen.Chat.route)
+                            navigateAndClearBackstack(Screen.ChatList.route)
                         }
                     }
                 },
@@ -208,7 +259,7 @@ fun CerevyaAppContent(
                         when {
                             currentFirebaseUser == null -> navigateTo(Screen.Welcome.route)
                             needsSetup -> navigateTo(Screen.ProfileSetup.route)
-                            else -> navigateTo(Screen.Chat.route)
+                            else -> navigateTo(Screen.ChatList.route)
                         }
                     }
                 )
@@ -240,8 +291,33 @@ fun CerevyaAppContent(
                     onComplete = { name ->
                         scope.launch {
                             app.firestoreUserManager.completeProfileSetup(name)
-                            navigateTo(Screen.Chat.route)
+                            navigateTo(Screen.ChatList.route)
                         }
+                    }
+                )
+            }
+
+            // Chat List Screen
+            composable(Screen.ChatList.route) {
+                ChatListScreen(
+                    chats = chats,
+                    activeChatId = activeChat?.chatId,
+                    onChatClick = { chat ->
+                        scope.launch {
+                            app.chatManager.setActiveChat(chat.chatId)
+                            navigateToChat(chat.chatId)
+                        }
+                    },
+                    onNewChatClick = {
+                        createNewChat()
+                    },
+                    onDeleteChat = { chat ->
+                        scope.launch {
+                            app.chatManager.deleteChat(chat.chatId)
+                        }
+                    },
+                    onMenuClick = {
+                        scope.launch { drawerState.open() }
                     }
                 )
             }
@@ -251,6 +327,16 @@ fun CerevyaAppContent(
                 val chatViewModel: ChatViewModel = viewModel(
                     factory = ChatViewModel.Factory(app.memoryRepository, app.chatManager)
                 )
+                
+                // Carregar chat ativo se existir
+                LaunchedEffect(activeChat) {
+                    activeChat?.let { chat ->
+                        chatViewModel.loadChat(chat.chatId)
+                    }
+                }
+                
+                val uiState by chatViewModel.uiState.collectAsState()
+                
                 ChatScreen(
                     viewModel = chatViewModel,
                     onMenuClick = {
@@ -258,7 +344,8 @@ fun CerevyaAppContent(
                     },
                     onMemoryClick = { memoryId ->
                         navigateTo("${Screen.Memory.route}?id=$memoryId")
-                    }
+                    },
+                    chatTitle = uiState.chatTitle
                 )
             }
 
