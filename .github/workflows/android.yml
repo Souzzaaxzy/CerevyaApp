@@ -24,6 +24,10 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v2
 
+      - name: Create Secrets
+        run: |
+          echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" > CerevyaApp/secrets.properties
+
       - name: Create Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > CerevyaApp/app/cerevya-keystore.jks
