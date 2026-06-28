@@ -47,7 +47,15 @@ class ChatRepository(context: Context) {
         }
     }
     
-    suspend fun createChat(): ChatEntity = withContext(Dispatchers.IO) {
+    /**
+     * Creates a new empty chat
+     * Always starts fresh - never loads previous chat
+     */
+    suspend fun createNewChat(): ChatEntity = withContext(Dispatchers.IO) {
+        // Clear any active chat state first
+        _activeChat.value = null
+        _messages.value = emptyList()
+        
         val chatId = java.util.UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
         
@@ -64,27 +72,48 @@ class ChatRepository(context: Context) {
         chatDao.deactivateOtherChats(chatId)
         
         _activeChat.value = chat
-        _messages.value = emptyList()
         
         chat
     }
     
-    suspend fun setActiveChat(chatId: String) = withContext(Dispatchers.IO) {
+    /**
+     * Backward compatibility alias
+     */
+    suspend fun createChat(): ChatEntity = createNewChat()
+    
+    /**
+     * Opens an existing chat by ID
+     */
+    suspend fun openChat(chatId: String) = withContext(Dispatchers.IO) {
         val chat = chatDao.getChatById(chatId)
         if (chat != null) {
             chatDao.activateChat(chatId)
             _activeChat.value = chat.copy(isActive = true)
             
-            // Carregar mensagens
+            // Load messages
             val msgs = chatDao.getMessagesForChatSync(chatId)
             _messages.value = msgs.map { it.toMessageEntity() }
         }
     }
     
+    /**
+     * Backward compatibility alias
+     */
+    suspend fun setActiveChat(chatId: String) = openChat(chatId)
+    
+    /**
+     * Initializes a fresh chat when app opens
+     * Does NOT restore previous chat
+     */
+    suspend fun initializeFreshChat(): ChatEntity = withContext(Dispatchers.IO) {
+        // Always create new empty chat on app start
+        createNewChat()
+    }
+    
     suspend fun sendMessage(text: String, userName: String = "Usuário"): Boolean = withContext(Dispatchers.IO) {
         var chat = _activeChat.value
         if (chat == null) {
-            chat = createChat()
+            chat = createNewChat()
         }
         
         val messageId = java.util.UUID.randomUUID().toString()
@@ -103,7 +132,7 @@ class ChatRepository(context: Context) {
         chatDao.insertMessage(message)
         chatDao.incrementMessageCount(chat.chatId, now)
         
-        // Atualizar título do chat se for a primeira mensagem
+        // Update chat title if first message
         if (chat.title == "Nova conversa") {
             val title = if (text.length > 50) text.take(47) + "..." else text
             chatDao.updateChatTitle(chat.chatId, title, now)
@@ -160,13 +189,9 @@ class ChatRepository(context: Context) {
         }
     }
     
-    suspend fun getActiveChat(): ChatEntity? = withContext(Dispatchers.IO) {
-        chatDao.getActiveChat()
-    }
-    
-    fun clearMessages() {
-        _messages.value = emptyList()
+    fun clearActiveChat() {
         _activeChat.value = null
+        _messages.value = emptyList()
     }
     
     private fun ChatMessageEntity.toMessageEntity(): MessageEntity {

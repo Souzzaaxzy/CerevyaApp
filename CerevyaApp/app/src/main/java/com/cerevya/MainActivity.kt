@@ -156,7 +156,7 @@ fun CerevyaAppContent(
     // Create new chat and navigate
     fun handleNewChatClick() {
         scope.launch {
-            app.chatRepository.createChat()
+            app.chatRepository.createNewChat()
         }
     }
 
@@ -275,10 +275,11 @@ fun CerevyaAppContent(
                     factory = ChatViewModel.Factory(app.memoryRepository, app.chatRepository, app.aiChatManager)
                 )
                 
-                LaunchedEffect(activeChat) {
-                    activeChat?.let { chat ->
-                        chatViewModel.loadChat(chat.chatId)
-                    }
+                // Initialize fresh chat on screen entry - never restore previous
+                LaunchedEffect(Unit) {
+                    // Create new empty chat every time this screen is opened
+                    val newChat = app.chatRepository.initializeFreshChat()
+                    chatViewModel.loadChat(newChat.chatId)
                 }
                 
                 val uiState by chatViewModel.uiState.collectAsState()
