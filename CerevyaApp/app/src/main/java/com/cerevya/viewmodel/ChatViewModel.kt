@@ -3,9 +3,10 @@ package com.cerevya.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.cerevya.ai.AIChatManager
+import com.cerevya.ai.AIState
 import com.cerevya.data.chat.ChatRepository
 import com.cerevya.data.chat.MessageEntity
-import com.cerevya.data.chat.MessageRole
 import com.cerevya.data.database.ChatEntity
 import com.cerevya.data.repository.MemoryRepository
 import com.cerevya.domain.models.MemoryEntity
@@ -18,14 +19,20 @@ data class ChatUiState(
     val messages: List<MessageEntity> = emptyList(),
     val inputText: String = "",
     val isLoading: Boolean = false,
+    val isAIThinking: Boolean = false,
+    val isAIResponding: Boolean = false,
+    val aiPartialResponse: String = "",
     val memoryResults: List<MemoryEntity> = emptyList(),
     val error: String? = null,
-    val chatTitle: String? = null
+    val chatTitle: String? = null,
+    val showRetryButton: Boolean = false,
+    val noInternet: Boolean = false
 )
 
 class ChatViewModel(
     private val repository: MemoryRepository,
-    private val chatRepository: ChatRepository
+    private val chatRepository: ChatRepository,
+    private val aiChatManager: AIChatManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -51,6 +58,72 @@ class ChatViewModel(
         viewModelScope.launch {
             chatRepository.messages.collect { messages ->
                 _uiState.value = _uiState.value.copy(messages = messages)
+            }
+        }
+        
+        // Observar estado da IA
+        viewModelScope.launch {
+            aiChatManager.aiState.collect { state ->
+                when (state) {
+                    is AIState.Idle -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isAIThinking = false,
+                            isAIResponding = false,
+                            aiPartialResponse = "",
+                            showRetryButton = false,
+                            noInternet = false
+                        )
+                    }
+                    is AIState.Thinking -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isAIThinking = true,
+                            isAIResponding = false,
+                            aiPartialResponse = "",
+                            showRetryButton = false
+                        )
+                    }
+                    is AIState.Responding -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isAIThinking = false,
+                            isAIResponding = true,
+                            aiPartialResponse = state.partialContent,
+                            showRetryButton = false
+                        )
+                    }
+                    is AIState.Error -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isAIThinking = false,
+                            isAIResponding = false,
+                            aiPartialResponse = "",
+                            error = state.message,
+                            showRetryButton = true
+                        )
+                    }
+                    is AIState.NoInternet -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isAIThinking = false,
+                            isAIResponding = false,
+                            aiPartialResponse = "",
+                            noInternet = true,
+                            showRetryButton = true
+                        )
+                    }
+                    is AIState.Timeout -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isAIThinking = false,
+                            isAIResponding = false,
+                            aiPartialResponse = "",
+                            error = "A IA está demorando mais que o esperado",
+                            showRetryButton = true
+                        )
+                    }
+                }
             }
         }
     }
@@ -85,48 +158,46 @@ class ChatViewModel(
     fun clearMemoryResults() {
         _uiState.value = _uiState.value.copy(memoryResults = emptyList())
     }
-
+    
+    /**
+     * Envia mensagem para a IA
+     */
     fun sendMessage() {
         val text = _uiState.value.inputText.trim()
         if (text.isEmpty()) return
+        
+        // Verificar se já está processando
+        if (_uiState.value.isAIThinking || _uiState.value.isAIResponding) {
+            return
+        }
 
         _uiState.value = _uiState.value.copy(
             inputText = "",
-            memoryResults = emptyList()
+            memoryResults = emptyList(),
+            error = null,
+            showRetryButton = false,
+            noInternet = false
         )
 
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            
-            // Salvar mensagem localmente
-            val success = chatRepository.sendMessage(text)
-            
-            if (success) {
-                // Adicionar resposta mock para testes
-                addMockResponse()
-            } else {
-                _uiState.value = _uiState.value.copy(
-                    error = "Erro ao enviar mensagem"
-                )
-            }
-            
-            _uiState.value = _uiState.value.copy(isLoading = false)
+            aiChatManager.sendUserMessage(text)
         }
     }
     
     /**
-     * Adiciona resposta mock para testes
+     * Tenta novamente após erro
      */
-    private suspend fun addMockResponse() {
-        val responses = listOf(
-            "👋 Entendi! Sua mensagem foi recebida.\n\nEsta é uma resposta de teste enquanto a IA não está integrada. Continue enviando mensagens para testar o sistema!",
-            "💬 Mensagem registrada!\n\nO sistema de chat está funcionando corretamente. Aguarde a integração com a IA para respostas mais inteligentes.",
-            "✅ Recebido! Mensagem salva com sucesso.\n\nPosso ajudar com algo mais?",
-            "🎯 Entendi sua mensagem!\n\nO sistema está funcionando em modo de testes. Aguarde a integração da IA para funcionalidades completas.",
-            "🧠 Mensagem processada!\n\nO histórico da conversa está sendo mantido corretamente."
-        )
-        
-        chatRepository.saveAssistantMessage(responses.random())
+    fun retry() {
+        viewModelScope.launch {
+            aiChatManager.retryLastMessage()
+        }
+    }
+    
+    /**
+     * Cancela processamento atual
+     */
+    fun cancelProcessing() {
+        aiChatManager.cancelProcessing()
     }
 
     fun clearError() {
@@ -139,11 +210,12 @@ class ChatViewModel(
 
     class Factory(
         private val repository: MemoryRepository,
-        private val chatRepository: ChatRepository
+        private val chatRepository: ChatRepository,
+        private val aiChatManager: AIChatManager
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return ChatViewModel(repository, chatRepository) as T
+            return ChatViewModel(repository, chatRepository, aiChatManager) as T
         }
     }
 }

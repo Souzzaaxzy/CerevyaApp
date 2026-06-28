@@ -272,7 +272,7 @@ fun CerevyaAppContent(
             // Chat Screen - main screen after login
             composable(Screen.Chat.route) {
                 val chatViewModel: ChatViewModel = viewModel(
-                    factory = ChatViewModel.Factory(app.memoryRepository, app.chatRepository)
+                    factory = ChatViewModel.Factory(app.memoryRepository, app.chatRepository, app.aiChatManager)
                 )
                 
                 LaunchedEffect(activeChat) {

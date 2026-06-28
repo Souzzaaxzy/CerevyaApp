@@ -1,6 +1,11 @@
 package com.cerevya
 
 import android.app.Application
+import com.cerevya.ai.AIChatManager
+import com.cerevya.ai.AIConfig
+import com.cerevya.ai.AIModel
+import com.cerevya.ai.AIProvider
+import com.cerevya.ai.AIService
 import com.cerevya.auth.FirebaseAuthManager
 import com.cerevya.cloud.CloudMemoryManager
 import com.cerevya.data.chat.ChatManager
@@ -28,6 +33,27 @@ class CerevyaApplication : Application() {
     
     // Chat Repository (Room) - para funcionamento local/offline
     val chatRepository: ChatRepository by lazy { ChatRepository(this) }
+    
+    // AI Service - Groq API
+    val aiService: AIService by lazy {
+        // Chave da API Groq - Em produção, usar variáveis de ambiente ou secrets seguros
+        val apiKey = preferencesManager.getApiKey() ?: ""
+        val config = AIConfig(
+            provider = AIProvider.GROQ,
+            model = AIModel.LLAMA_3_3_70B,
+            apiKey = apiKey,
+            baseUrl = "https://api.groq.com/openai/v1",
+            maxTokens = 4096,
+            temperature = 0.7f,
+            streamingEnabled = true
+        )
+        AIService(config)
+    }
+    
+    // AI Chat Manager - Coordena chat com IA
+    val aiChatManager: AIChatManager by lazy {
+        AIChatManager(chatRepository, aiService)
+    }
     
     // Cloud and sync (prepared for when Firebase is fully configured)
     val cloudMemoryManager: CloudMemoryManager by lazy { CloudMemoryManager() }

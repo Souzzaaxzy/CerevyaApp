@@ -126,6 +126,10 @@ dependencies {
     
     // Coil for image loading
     implementation("io.coil-kt:coil-compose:2.5.0")
+    
+    // OkHttp for API calls
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okio:okio:3.9.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

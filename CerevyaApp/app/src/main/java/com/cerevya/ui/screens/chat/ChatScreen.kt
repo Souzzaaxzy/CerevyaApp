@@ -1,5 +1,8 @@
 package com.cerevya.ui.screens.chat
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,9 +21,15 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -35,6 +44,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -54,9 +64,14 @@ fun ChatScreen(
     val listState = rememberLazyListState()
 
     // Auto scroll to bottom when new messages arrive
-    LaunchedEffect(uiState.messages.size) {
-        if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.size - 1)
+    LaunchedEffect(uiState.messages.size, uiState.isAIResponding, uiState.isAIThinking) {
+        val targetIndex = if (uiState.messages.isNotEmpty()) {
+            uiState.messages.size - 1
+        } else {
+            0
+        }
+        if (targetIndex >= 0) {
+            listState.animateScrollToItem(targetIndex)
         }
     }
 
@@ -89,41 +104,9 @@ fun ChatScreen(
         )
 
         // Messages list or welcome screen
-        if (uiState.messages.isEmpty()) {
+        if (uiState.messages.isEmpty() && !uiState.isAIThinking && !uiState.isAIResponding) {
             // Welcome screen when no messages
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        text = "Bem-vindo ao Cerevya!",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Abra o menu lateral e clique em 'Novo Chat' para começar uma conversa.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
+            WelcomeScreen()
         } else {
             LazyColumn(
                 modifier = Modifier
@@ -139,6 +122,32 @@ fun ChatScreen(
                     MessageBubble(message = message)
                 }
                 
+                // AI Thinking indicator
+                if (uiState.isAIThinking) {
+                    item {
+                        AIThinkingIndicator()
+                    }
+                }
+                
+                // AI Responding with partial content
+                if (uiState.isAIResponding && uiState.aiPartialResponse.isNotEmpty()) {
+                    item {
+                        AIPartialResponse(content = uiState.aiPartialResponse)
+                    }
+                }
+                
+                // Error or No Internet state
+                if (uiState.error != null || uiState.noInternet) {
+                    item {
+                        ErrorStateCard(
+                            message = uiState.error ?: "Sem conexão com a internet",
+                            showRetry = uiState.showRetryButton,
+                            onRetry = { viewModel.retry() }
+                        )
+                    }
+                }
+                
+                // Memory results
                 if (uiState.memoryResults.isNotEmpty()) {
                     item {
                         Column(
@@ -154,31 +163,159 @@ fun ChatScreen(
                         }
                     }
                 }
-                
-                if (uiState.isLoading) {
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
-                            )
-                        }
-                    }
-                }
             }
         }
 
-        // Chat input
+        // Chat input - disabled while AI is processing
         com.cerevya.ui.components.chat.ChatInput(
             text = uiState.inputText,
             onTextChange = viewModel::updateInputText,
             onSendClick = viewModel::sendMessage,
-            enabled = !uiState.isLoading
+            enabled = !uiState.isAIThinking && !uiState.isAIResponding
         )
+    }
+}
+
+@Composable
+private fun WelcomeScreen() {
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.AutoAwesome,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = "Bem-vindo ao Cerevya!",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Abra o menu lateral e clique em 'Novo Chat' para começar uma conversa.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun AIThinkingIndicator() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            ),
+            shape = RoundedCornerShape(
+                topStart = 4.dp,
+                topEnd = 16.dp,
+                bottomStart = 16.dp,
+                bottomEnd = 16.dp
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Pensando...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontStyle = FontStyle.Italic
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AIPartialResponse(content: String) {
+    MessageBubble(
+        message = com.cerevya.data.chat.MessageEntity(
+            messageId = "partial",
+            chatId = "",
+            uid = "",
+            text = content,
+            role = com.cerevya.data.chat.MessageRole.ASSISTANT,
+            timestamp = System.currentTimeMillis(),
+            userName = "Cerevya",
+            userPhotoUrl = ""
+        )
+    )
+}
+
+@Composable
+private fun ErrorStateCard(
+    message: String,
+    showRetry: Boolean,
+    onRetry: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = Icons.Default.WifiOff,
+                contentDescription = null,
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.error
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                textAlign = TextAlign.Center
+            )
+            if (showRetry) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(onClick = onRetry) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.size(8.dp))
+                    Text("Tentar novamente")
+                }
+            }
+        }
     }
 }
