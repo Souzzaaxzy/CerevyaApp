@@ -158,7 +158,7 @@ fun CerevyaAppContent(
     }
 
     // Create new chat and navigate
-    val onNewChatClick = {
+    fun handleNewChatClick() {
         scope.launch {
             val chat = app.chatManager.createChat()
             chat?.let {
@@ -218,7 +218,7 @@ fun CerevyaAppContent(
                 onProfileClick = {
                     navigateTo(Screen.Profile.route)
                 },
-                onNewChatClick = onNewChatClick
+                onNewChatClick = { handleNewChatClick() }
             )
         }
     ) {

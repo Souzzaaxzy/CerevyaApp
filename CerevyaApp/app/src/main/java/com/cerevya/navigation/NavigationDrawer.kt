@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -115,9 +116,7 @@ fun NavigationDrawerContent(
             )
 
             // Navigation Items (Memórias and Configurações only)
-            DrawerMenuItem.entries
-                .filter { it != DrawerMenuItem.CHAT }
-                .forEach { item ->
+            DrawerMenuItem.entries.forEach { item ->
                     val route = when (item) {
                         DrawerMenuItem.MEMORIES -> Screen.Memory.route
                         DrawerMenuItem.SETTINGS -> Screen.Settings.route
