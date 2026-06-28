@@ -45,23 +45,7 @@ class AIService(private var config: AIConfig) {
     
     fun sendMessageStreaming(messages: List<AIMessage>): Flow<Result<StreamChunk>> = flow {
         try {
-            val requestBody = buildString {
-                append("{")
-                append("\"model\": \"${config.model.modelId}\",")
-                append("\"messages\": [")
-                messages.forEachIndexed { index, msg ->
-                    append("{")
-                    append("\"role\": \"${msg.role.name.lowercase()}\",")
-                    append("\"content\": \"${escapeJson(msg.content)}\"")
-                    append("}")
-                    if (index < messages.size - 1) append(",")
-                }
-                append("],")
-                append("\"temperature\": ${config.temperature},")
-                append("\"max_tokens\": ${config.maxTokens},")
-                append("\"stream\": true")
-                append("}")
-            }
+            val requestBody = buildJsonRequest(messages, stream = true)
             
             val request = Request.Builder()
                 .url("${config.baseUrl}/chat/completions")
@@ -73,7 +57,7 @@ class AIService(private var config: AIConfig) {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string() ?: "Unknown error"
-                    emit(Result.failure(AIException(AIErrorType.API_ERROR, "API Error: ${response.code} - $errorBody")))
+                    emit(Result.failure(AIException(AIErrorType.API_ERROR, "API Error: ${response.code}")))
                     return@flow
                 }
                 
@@ -96,6 +80,7 @@ class AIService(private var config: AIConfig) {
                                 emit(Result.success(it))
                             }
                         } catch (e: Exception) {
+                            // Skip invalid chunks
                         }
                     }
                 }
@@ -109,24 +94,26 @@ class AIService(private var config: AIConfig) {
         }
     }
     
-    private suspend fun makeRequest(messages: List<AIMessage>, stream: Boolean): ChatResponse = withContext(Dispatchers.IO) {
-        val requestBody = buildString {
-            append("{")
-            append("\"model\": \"${config.model.modelId}\",")
-            append("\"messages\": [")
-            messages.forEachIndexed { index, msg ->
-                append("{")
-                append("\"role\": \"${msg.role.name.lowercase()}\",")
-                append("\"content\": \"${escapeJson(msg.content)}\"")
-                append("}")
-                if (index < messages.size - 1) append(",")
-            }
-            append("],")
-            append("\"temperature\": ${config.temperature},")
-            append("\"max_tokens\": ${config.maxTokens},")
-            append("\"stream\": $stream")
-            append("}")
+    private fun buildJsonRequest(messages: List<AIMessage>, stream: Boolean): String {
+        val sb = StringBuilder()
+        sb.append("{")
+        sb.append("\"model\":\"${config.model.modelId}\",")
+        sb.append("\"messages\":[")
+        messages.forEachIndexed { index, msg ->
+            sb.append("{\"role\":\"${msg.role.name.lowercase()}\",")
+            sb.append("\"content\":\"${escapeJson(msg.content)}\"}")
+            if (index < messages.size - 1) sb.append(",")
         }
+        sb.append("],")
+        sb.append("\"temperature\":${config.temperature},")
+        sb.append("\"max_tokens\":${config.maxTokens},")
+        sb.append("\"stream\":$stream")
+        sb.append("}")
+        return sb.toString()
+    }
+    
+    private suspend fun makeRequest(messages: List<AIMessage>, stream: Boolean): ChatResponse = withContext(Dispatchers.IO) {
+        val requestBody = buildJsonRequest(messages, stream)
         
         val request = Request.Builder()
             .url("${config.baseUrl}/chat/completions")
@@ -138,7 +125,7 @@ class AIService(private var config: AIConfig) {
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: "Unknown error"
-                throw AIException(AIErrorType.API_ERROR, "API Error: ${response.code} - $errorBody")
+                throw AIException(AIErrorType.API_ERROR, "API Error: ${response.code}")
             }
             
             val body = response.body?.string() ?: throw AIException(AIErrorType.API_ERROR, "Empty response")
@@ -147,9 +134,9 @@ class AIService(private var config: AIConfig) {
     }
     
     private fun parseChatResponse(json: String): ChatResponse {
-        val content = json.extractJsonValue("content")
-        val model = json.extractJsonValue("model")
-        val id = json.extractJsonValue("id")
+        val content = extractJsonValue(json, "content")
+        val model = extractJsonValue(json, "model")
+        val id = extractJsonValue(json, "id")
         
         return ChatResponse(
             id = id,
@@ -160,17 +147,17 @@ class AIService(private var config: AIConfig) {
     }
     
     private fun parseSSEChunk(json: String): StreamChunk? {
-        val content = json.extractJsonValue("content")
-        val finishReason = json.extractJsonValue("finish_reason")
+        val content = extractJsonValue(json, "content")
+        val finishReason = extractJsonValue(json, "finish_reason")
         
         return if (content.isNotEmpty()) {
             StreamChunk(content = content, isComplete = finishReason == "stop")
         } else null
     }
     
-    private fun String.extractJsonValue(key: String): String {
-        val pattern = """"$key"\s*:\s*\"?([^",}\]]+)""?".toRegex()
-        val match = pattern.find(this)
+    private fun extractJsonValue(json: String, key: String): String {
+        val pattern = "\"$key\"\\s*:\\s*\"?([^\",}]+)".toRegex()
+        val match = pattern.find(json)
         return match?.groupValues?.getOrNull(1)?.trim() ?: ""
     }
     
