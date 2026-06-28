@@ -12,17 +12,6 @@ import java.io.IOException
 import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 
-/**
- * Serviço de IA centralizado para comunicação com provedores
- * 
- * Suporta:
- * - Groq API (padrão)
- * - OpenAI
- * - DeepSeek
- * - Gemini
- * 
- * Preparado para streaming de respostas
- */
 class AIService(private var config: AIConfig) {
     
     private val client = OkHttpClient.Builder()
@@ -33,39 +22,27 @@ class AIService(private var config: AIConfig) {
     
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
     
-    /**
-     * Atualiza a configuração da API
-     */
     fun updateConfig(newConfig: AIConfig) {
         config = newConfig
     }
     
-    /**
-     * Atualiza apenas a chave da API
-     */
     fun updateApiKey(apiKey: String) {
         config = config.copy(apiKey = apiKey)
     }
     
-    /**
-     * Envia mensagem para a IA e retorna resposta completa
-     */
     suspend fun sendMessage(messages: List<AIMessage>): Result<ChatResponse> = withContext(Dispatchers.IO) {
         try {
             val response = makeRequest(messages, stream = false)
             Result.success(response)
         } catch (e: SocketTimeoutException) {
-            Result.failure(AIException(AIErrorType.TIMEOUT, "A resposta está demorando mais que o esperado"))
+            Result.failure(AIException(AIErrorType.TIMEOUT, "Response timeout"))
         } catch (e: IOException) {
-            Result.failure(AIException(AIErrorType.NO_INTERNET, "Sem conexão com a internet"))
+            Result.failure(AIException(AIErrorType.NO_INTERNET, "No internet connection"))
         } catch (e: Exception) {
-            Result.failure(AIException(AIErrorType.API_ERROR, e.message ?: "Erro desconhecido"))
+            Result.failure(AIException(AIErrorType.API_ERROR, e.message ?: "Unknown error"))
         }
     }
     
-    /**
-     * Envia mensagem e retorna fluxo de chunks para streaming
-     */
     fun sendMessageStreaming(messages: List<AIMessage>): Flow<Result<StreamChunk>> = flow {
         try {
             val requestBody = buildString {
@@ -75,7 +52,7 @@ class AIService(private var config: AIConfig) {
                 messages.forEachIndexed { index, msg ->
                     append("{")
                     append("\"role\": \"${msg.role.name.lowercase()}\",")
-                    append("\"content\": ${escapeJson(msg.content)}")
+                    append("\"content\": \"${escapeJson(msg.content)}\"")
                     append("}")
                     if (index < messages.size - 1) append(",")
                 }
@@ -95,12 +72,12 @@ class AIService(private var config: AIConfig) {
             
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    val errorBody = response.body?.string() ?: "Erro desconhecido"
-                    emit(Result.failure(AIException(AIErrorType.API_ERROR, "Erro da API: ${response.code} - $errorBody")))
+                    val errorBody = response.body?.string() ?: "Unknown error"
+                    emit(Result.failure(AIException(AIErrorType.API_ERROR, "API Error: ${response.code} - $errorBody")))
                     return@flow
                 }
                 
-                val body = response.body ?: throw AIException(AIErrorType.API_ERROR, "Resposta vazia")
+                val body = response.body ?: throw AIException(AIErrorType.API_ERROR, "Empty response")
                 val source = body.source()
                 
                 while (!source.exhausted()) {
@@ -119,17 +96,16 @@ class AIService(private var config: AIConfig) {
                                 emit(Result.success(it))
                             }
                         } catch (e: Exception) {
-                            // Ignora chunks inválidos
                         }
                     }
                 }
             }
         } catch (e: SocketTimeoutException) {
-            emit(Result.failure(AIException(AIErrorType.TIMEOUT, "A resposta está demorando mais que o esperado")))
+            emit(Result.failure(AIException(AIErrorType.TIMEOUT, "Response timeout")))
         } catch (e: IOException) {
-            emit(Result.failure(AIException(AIErrorType.NO_INTERNET, "Sem conexão com a internet")))
+            emit(Result.failure(AIException(AIErrorType.NO_INTERNET, "No internet connection")))
         } catch (e: Exception) {
-            emit(Result.failure(AIException(AIErrorType.API_ERROR, e.message ?: "Erro desconhecido")))
+            emit(Result.failure(AIException(AIErrorType.API_ERROR, e.message ?: "Unknown error")))
         }
     }
     
@@ -141,7 +117,7 @@ class AIService(private var config: AIConfig) {
             messages.forEachIndexed { index, msg ->
                 append("{")
                 append("\"role\": \"${msg.role.name.lowercase()}\",")
-                append("\"content\": ${escapeJson(msg.content)}")
+                append("\"content\": \"${escapeJson(msg.content)}\"")
                 append("}")
                 if (index < messages.size - 1) append(",")
             }
@@ -161,17 +137,16 @@ class AIService(private var config: AIConfig) {
         
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                val errorBody = response.body?.string() ?: "Erro desconhecido"
-                throw AIException(AIErrorType.API_ERROR, "Erro da API: ${response.code} - $errorBody")
+                val errorBody = response.body?.string() ?: "Unknown error"
+                throw AIException(AIErrorType.API_ERROR, "API Error: ${response.code} - $errorBody")
             }
             
-            val body = response.body?.string() ?: throw AIException(AIErrorType.API_ERROR, "Resposta vazia")
+            val body = response.body?.string() ?: throw AIException(AIErrorType.API_ERROR, "Empty response")
             parseChatResponse(body)
         }
     }
     
     private fun parseChatResponse(json: String): ChatResponse {
-        // Parse simples do JSON (para evitar dependência de biblioteca extra)
         val content = json.extractJsonValue("content")
         val model = json.extractJsonValue("model")
         val id = json.extractJsonValue("id")
@@ -194,7 +169,7 @@ class AIService(private var config: AIConfig) {
     }
     
     private fun String.extractJsonValue(key: String): String {
-        val pattern = """"$key"\s*:\s*"?([^",}\]]+)""?".toRegex()
+        val pattern = """"$key"\s*:\s*\"?([^",}\]]+)""?".toRegex()
         val match = pattern.find(this)
         return match?.groupValues?.getOrNull(1)?.trim() ?: ""
     }
@@ -209,9 +184,6 @@ class AIService(private var config: AIConfig) {
     }
 }
 
-/**
- * Tipos de erro da IA
- */
 enum class AIErrorType {
     NO_INTERNET,
     TIMEOUT,
@@ -221,9 +193,6 @@ enum class AIErrorType {
     UNKNOWN
 }
 
-/**
- * Exceção da IA
- */
 class AIException(
     val errorType: AIErrorType,
     override val message: String
