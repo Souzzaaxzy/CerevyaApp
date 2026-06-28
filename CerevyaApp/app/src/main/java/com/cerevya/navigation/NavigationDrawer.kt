@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -16,12 +15,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.Icon
@@ -32,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -51,7 +53,8 @@ fun NavigationDrawerContent(
     userEmail: String?,
     memoryCount: Int,
     onNavigate: (String) -> Unit,
-    onProfileClick: () -> Unit
+    onProfileClick: () -> Unit,
+    onNewChatClick: () -> Unit
 ) {
     ModalDrawerSheet(
         modifier = Modifier.fillMaxHeight()
@@ -77,26 +80,62 @@ fun NavigationDrawerContent(
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
             )
 
-            // Navigation Items
-            DrawerMenuItem.entries.forEach { item ->
-                val route = when (item) {
-                    DrawerMenuItem.CHAT -> Screen.ChatList.route
-                    DrawerMenuItem.MEMORIES -> Screen.Memory.route
-                    DrawerMenuItem.SETTINGS -> Screen.Settings.route
-                }
-                
-                DrawerMenuItemRow(
-                    icon = item.icon,
-                    title = item.title,
-                    isSelected = currentRoute == route,
-                    onClick = {
-                        scope.launch {
-                            drawerState.close()
-                        }
-                        onNavigate(route)
-                    }
+            // Novo Chat Button (ChatGPT style - highlighted CTA)
+            Button(
+                onClick = {
+                    scope.launch { drawerState.close() }
+                    onNewChatClick()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .height(48.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Folder,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Novo Chat",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
                 )
             }
+            
+            Divider(
+                modifier = Modifier.padding(vertical = 8.dp),
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+            )
+
+            // Navigation Items (Memórias and Configurações only)
+            DrawerMenuItem.entries
+                .filter { it != DrawerMenuItem.CHAT }
+                .forEach { item ->
+                    val route = when (item) {
+                        DrawerMenuItem.MEMORIES -> Screen.Memory.route
+                        DrawerMenuItem.SETTINGS -> Screen.Settings.route
+                        else -> ""
+                    }
+                    
+                    DrawerMenuItemRow(
+                        icon = item.icon,
+                        title = item.title,
+                        isSelected = currentRoute == route,
+                        onClick = {
+                            scope.launch {
+                                drawerState.close()
+                            }
+                            onNavigate(route)
+                        }
+                    )
+                }
             
             Spacer(modifier = Modifier.height(16.dp))
             

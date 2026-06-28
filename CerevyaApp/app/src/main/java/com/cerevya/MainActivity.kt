@@ -34,7 +34,6 @@ import com.cerevya.navigation.Screen
 import com.cerevya.theme.CerevyaTheme
 import com.cerevya.ui.screens.auth.ProfileSetupScreen
 import com.cerevya.ui.screens.auth.WelcomeScreen
-import com.cerevya.ui.screens.chat.ChatListScreen
 import com.cerevya.ui.screens.chat.ChatScreen
 import com.cerevya.ui.screens.memory.MemoryScreen
 import com.cerevya.ui.screens.profile.ProfileScreen
@@ -53,7 +52,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
-        // Initialize Google Sign-In client
         val webClientId = "197213311795-j212a6dgjeab9fs2ibqhlfortjiqo8rt.apps.googleusercontent.com"
         val googleSignInClient = GoogleSignIn.getClient(
             this,
@@ -93,28 +91,19 @@ fun CerevyaAppContent(
     
     val app = context.applicationContext as CerevyaApplication
     
-    // Firebase Auth state
     val firebaseAuth = FirebaseAuth.getInstance()
     val currentFirebaseUser by remember { mutableStateOf(firebaseAuth.currentUser) }
     
-    // Collect Firestore user state
     val firestoreUser by app.firestoreUserManager.currentUser.collectAsState()
     val needsSetup by app.firestoreUserManager.needsSetup.collectAsState()
     val memoryCount by app.memoryRepository.getAllMemories().collectAsState(initial = emptyList())
-    
-    // Collect chats state
-    val chats by app.chatManager.chats.collectAsState()
     val activeChat by app.chatManager.activeChat.collectAsState()
     
-    // Auth state
     var isSignInLoading by remember { mutableStateOf(false) }
 
-    // Setup observer para alterações em tempo real do Firestore
     LaunchedEffect(currentFirebaseUser) {
         if (currentFirebaseUser != null) {
-            // Criar usuário no Firestore se não existir
             app.firestoreUserManager.createUserIfNotExists()
-            // Iniciar observação de chats
             app.chatManager.observeChats()
         } else {
             app.firestoreUserManager.disconnect()
@@ -122,14 +111,12 @@ fun CerevyaAppContent(
         }
     }
 
-    // Intercept back presses - proper app navigation
     BackHandler(enabled = currentRoute != Screen.Welcome.route && currentRoute != Screen.ProfileSetup.route) {
         val canPop = navController.previousBackStackEntry != null
         if (canPop) {
             navController.popBackStack()
             currentRoute = navController.currentDestination?.route
         } else {
-            // At root, exit app
             val currentTime = System.currentTimeMillis()
             if (currentTime - lastBackPressTime < 2000) {
                 (context as? ComponentActivity)?.finish()
@@ -140,35 +127,24 @@ fun CerevyaAppContent(
         }
     }
 
-    // Navigate function - preserves backstack like a proper app
+    // Navigate function - preserves backstack
     val navigateTo = { route: String ->
         if (currentRoute != route) {
             currentRoute = route
             navController.navigate(route) {
-                // Don't pop everything, just avoid duplicate destinations
-                popUpTo(Screen.ChatList.route) { saveState = true }
+                popUpTo(Screen.Chat.route) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
             }
         }
     }
 
-    // Navigate to chat with specific chatId
-    val navigateToChat = { chatId: String ->
-        currentRoute = Screen.Chat.route
-        navController.navigate(Screen.Chat.route) {
-            popUpTo(Screen.ChatList.route) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-        }
-    }
-
-    // Navigate back function - proper app navigation
+    // Navigate back function
     val navigateBack = {
         val canPop = navController.previousBackStackEntry != null
         if (canPop) {
             navController.popBackStack()
-            currentRoute = navController.currentDestination?.route ?: Screen.ChatList.route
+            currentRoute = navController.currentDestination?.route ?: Screen.Chat.route
         }
     }
 
@@ -182,26 +158,25 @@ fun CerevyaAppContent(
     }
 
     // Create new chat and navigate
-    val createNewChat = {
+    val onNewChatClick = {
         scope.launch {
             val chat = app.chatManager.createChat()
             chat?.let {
-                navigateToChat(it.chatId)
+                app.chatManager.setActiveChat(it.chatId)
             }
         }
     }
 
-    // Determine start destination based on Firebase Auth + Firestore
+    // Start destination - goes directly to Chat after login
     val startDestination = remember(currentFirebaseUser, firestoreUser, needsSetup) {
         when {
             currentFirebaseUser == null -> Screen.Welcome.route
-            firestoreUser == null -> Screen.Welcome.route // Aguardando Firestore
+            firestoreUser == null -> Screen.Welcome.route
             needsSetup -> Screen.ProfileSetup.route
-            else -> Screen.ChatList.route
+            else -> Screen.Chat.route
         }
     }
 
-    // Google Sign-In launcher
     val signInLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -210,15 +185,13 @@ fun CerevyaAppContent(
         app.firebaseAuthManager.handleGoogleSignInResult(result.data) { authResult ->
             authResult.fold(
                 onSuccess = { user ->
-                    // Criar documento no Firestore
                     scope.launch {
                         app.firestoreUserManager.createUserIfNotExists()
-                        // Redirecionar baseado no setup - clear backstack for auth flows
                         val needsSetupNow = app.firestoreUserManager.checkNeedsSetup()
                         if (needsSetupNow) {
                             navigateAndClearBackstack(Screen.ProfileSetup.route)
                         } else {
-                            navigateAndClearBackstack(Screen.ChatList.route)
+                            navigateAndClearBackstack(Screen.Chat.route)
                         }
                     }
                 },
@@ -244,7 +217,8 @@ fun CerevyaAppContent(
                 },
                 onProfileClick = {
                     navigateTo(Screen.Profile.route)
-                }
+                },
+                onNewChatClick = onNewChatClick
             )
         }
     ) {
@@ -252,20 +226,18 @@ fun CerevyaAppContent(
             navController = navController,
             startDestination = startDestination
         ) {
-            // Splash
             composable(Screen.Splash.route) {
                 SplashScreen(
                     onNavigateToChat = {
                         when {
                             currentFirebaseUser == null -> navigateTo(Screen.Welcome.route)
                             needsSetup -> navigateTo(Screen.ProfileSetup.route)
-                            else -> navigateTo(Screen.ChatList.route)
+                            else -> navigateTo(Screen.Chat.route)
                         }
                     }
                 )
             }
 
-            // Welcome Screen (Login)
             composable(Screen.Welcome.route) {
                 WelcomeScreen(
                     isLoading = isSignInLoading,
@@ -276,7 +248,6 @@ fun CerevyaAppContent(
                 )
             }
 
-            // Profile Setup Screen
             composable(Screen.ProfileSetup.route) {
                 ProfileSetupScreen(
                     user = firestoreUser,
@@ -291,44 +262,18 @@ fun CerevyaAppContent(
                     onComplete = { name ->
                         scope.launch {
                             app.firestoreUserManager.completeProfileSetup(name)
-                            navigateTo(Screen.ChatList.route)
+                            navigateTo(Screen.Chat.route)
                         }
                     }
                 )
             }
 
-            // Chat List Screen
-            composable(Screen.ChatList.route) {
-                ChatListScreen(
-                    chats = chats,
-                    activeChatId = activeChat?.chatId,
-                    onChatClick = { chat ->
-                        scope.launch {
-                            app.chatManager.setActiveChat(chat.chatId)
-                            navigateToChat(chat.chatId)
-                        }
-                    },
-                    onNewChatClick = {
-                        createNewChat()
-                    },
-                    onDeleteChat = { chat ->
-                        scope.launch {
-                            app.chatManager.deleteChat(chat.chatId)
-                        }
-                    },
-                    onMenuClick = {
-                        scope.launch { drawerState.open() }
-                    }
-                )
-            }
-
-            // Chat Screen
+            // Chat Screen - main screen after login
             composable(Screen.Chat.route) {
                 val chatViewModel: ChatViewModel = viewModel(
                     factory = ChatViewModel.Factory(app.memoryRepository, app.chatManager)
                 )
                 
-                // Carregar chat ativo se existir
                 LaunchedEffect(activeChat) {
                     activeChat?.let { chat ->
                         chatViewModel.loadChat(chat.chatId)
@@ -349,7 +294,6 @@ fun CerevyaAppContent(
                 )
             }
 
-            // Memory Screen
             composable(
                 route = Screen.Memory.route + "?id={id}",
                 arguments = listOf(
@@ -379,7 +323,6 @@ fun CerevyaAppContent(
                 )
             }
 
-            // Profile Screen
             composable(Screen.Profile.route) {
                 ProfileScreen(
                     user = firestoreUser,
@@ -398,7 +341,6 @@ fun CerevyaAppContent(
                 )
             }
 
-            // Settings Screen
             composable(Screen.Settings.route) {
                 val settingsViewModel: SettingsViewModel = viewModel(
                     factory = SettingsViewModel.Factory(
@@ -413,9 +355,7 @@ fun CerevyaAppContent(
                     onMenuClick = {
                         scope.launch { drawerState.open() }
                     },
-                    onSignInClick = {
-                        // Já logado
-                    },
+                    onSignInClick = { },
                     onLogoutComplete = {
                         FirebaseAuth.getInstance().signOut()
                         navigateTo(Screen.Welcome.route)

@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
@@ -21,7 +20,6 @@ enum class DrawerMenuItem(
     val title: String,
     val icon: ImageVector
 ) {
-    CHAT("Chat", Icons.Outlined.Chat),
     MEMORIES("Memórias", Icons.Outlined.Folder),
     SETTINGS("Configurações", Icons.Outlined.Settings)
 }
