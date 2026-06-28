@@ -3,23 +3,15 @@ package com.cerevya.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.cerevya.data.chat.ChatEntity
-import com.cerevya.data.chat.ChatManager
+import com.cerevya.data.chat.ChatRepository
 import com.cerevya.data.chat.MessageEntity
 import com.cerevya.data.chat.MessageRole
+import com.cerevya.data.database.ChatEntity
 import com.cerevya.data.repository.MemoryRepository
-import com.cerevya.domain.ContextManager
-import com.cerevya.domain.Intention
-import com.cerevya.domain.IntentionEngine
-import com.cerevya.domain.MemoryCategorizer
-import com.cerevya.domain.MemorySummarizer
-import com.cerevya.domain.SemanticSearch
-import com.cerevya.domain.models.Message
 import com.cerevya.domain.models.MemoryEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class ChatUiState(
@@ -33,23 +25,23 @@ data class ChatUiState(
 
 class ChatViewModel(
     private val repository: MemoryRepository,
-    private val chatManager: ChatManager
+    private val chatRepository: ChatRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
-    private val contextManager = ContextManager()
-
-    // Chat ativo atual
-    private var currentChatId: String? = null
+    // Observar chats
+    val chats: StateFlow<List<ChatEntity>> = chatRepository.chats
+    
+    // Chat ativo
+    val activeChat: StateFlow<ChatEntity?> = chatRepository.activeChat
 
     init {
         // Observar chat ativo
         viewModelScope.launch {
-            chatManager.activeChat.collect { chat ->
+            chatRepository.activeChat.collect { chat ->
                 chat?.let {
-                    currentChatId = it.chatId
                     _uiState.value = _uiState.value.copy(chatTitle = it.title)
                 }
             }
@@ -57,7 +49,7 @@ class ChatViewModel(
         
         // Observar mensagens do chat ativo
         viewModelScope.launch {
-            chatManager.messages.collect { messages ->
+            chatRepository.messages.collect { messages ->
                 _uiState.value = _uiState.value.copy(messages = messages)
             }
         }
@@ -67,13 +59,9 @@ class ChatViewModel(
      * Carrega as mensagens de um chat específico
      */
     fun loadChat(chatId: String) {
-        currentChatId = chatId
         viewModelScope.launch {
-            chatManager.setActiveChat(chatId)
-            // Iniciar observação de mensagens
-            chatManager.observeMessages(chatId).collect { messages ->
-                _uiState.value = _uiState.value.copy(messages = messages)
-            }
+            chatRepository.setActiveChat(chatId)
+            chatRepository.observeMessages(chatId)
         }
     }
 
@@ -82,14 +70,11 @@ class ChatViewModel(
      */
     fun createNewChat() {
         viewModelScope.launch {
-            val chat = chatManager.createChat()
-            chat?.let {
-                currentChatId = it.chatId
-                _uiState.value = _uiState.value.copy(
-                    messages = emptyList(),
-                    chatTitle = it.title
-                )
-            }
+            val chat = chatRepository.createChat()
+            _uiState.value = _uiState.value.copy(
+                messages = emptyList(),
+                chatTitle = chat.title
+            )
         }
     }
 
@@ -111,149 +96,54 @@ class ChatViewModel(
         )
 
         viewModelScope.launch {
-            // Salvar mensagem no Firestore
-            val success = chatManager.sendMessage(text)
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            
+            // Salvar mensagem localmente
+            val success = chatRepository.sendMessage(text)
             
             if (success) {
-                processUserMessage(text)
+                // Adicionar resposta mock para testes
+                addMockResponse()
             } else {
                 _uiState.value = _uiState.value.copy(
                     error = "Erro ao enviar mensagem"
                 )
             }
-        }
-    }
-
-    private suspend fun processUserMessage(text: String) {
-        _uiState.value = _uiState.value.copy(isLoading = true)
-        
-        try {
-            val recentContext = contextManager.getLastUserMessage()
-            val resolvedText = contextManager.resolveContext(text)
-            val intention = IntentionEngine.detectIntention(resolvedText, recentContext)
-            contextManager.addMessage(Message(content = text, isUser = true))
-
-            when (intention) {
-                Intention.SAVE_MEMORY -> handleSaveMemory(resolvedText)
-                Intention.SEARCH_MEMORY -> handleSearchMemory(resolvedText)
-                Intention.LIST_MEMORIES -> handleListMemories()
-                Intention.NORMAL_CHAT -> handleNormalChat()
-            }
-        } finally {
+            
             _uiState.value = _uiState.value.copy(isLoading = false)
         }
     }
-
-    private suspend fun handleSaveMemory(text: String) {
-        val context = contextManager.getLastUserMessage()
-        val content = IntentionEngine.extractMemoryContent(text, context)
-        
-        if (content.isNotEmpty()) {
-            val summary = MemorySummarizer.summarize(content)
-            val category = MemoryCategorizer.categorize(content)
-            
-            val memory = MemoryEntity(
-                content = content,
-                category = category.displayName,
-                tags = summary.tags.joinToString(",")
-            )
-            
-            repository.insertMemory(memory)
-            
-            // Salvar resposta no Firestore
-            chatManager.saveAssistantMessage(
-                "✅ Memória salva!\n\n📝 ${summary.title}\n📁 Categoria: ${category.displayName}\n🏷️ Tags: ${summary.tags.take(3).joinToString(", ")}"
-            )
-        } else {
-            chatManager.saveAssistantMessage(
-                "🤔 Não consegui identificar o conteúdo para salvar. Tente: 'salva isso: sua ideia'"
-            )
-        }
-    }
-
-    private suspend fun handleSearchMemory(text: String) {
-        try {
-            val searchQuery = IntentionEngine.extractSearchQuery(text)
-            val allMemories = repository.getAllMemories().first()
-            val searchResults = SemanticSearch.search(allMemories, searchQuery)
-            
-            if (searchResults.isEmpty()) {
-                chatManager.saveAssistantMessage(
-                    "🔍 Nenhuma memória encontrada para: \"$searchQuery\""
-                )
-            } else {
-                val topResults = searchResults.take(5).map { it.memory }
-                _uiState.value = _uiState.value.copy(memoryResults = topResults)
-                
-                val responseText = if (searchResults.size > 5) {
-                    "🔍 Encontrei ${searchResults.size} resultados (mostrando os 5 mais relevantes):"
-                } else {
-                    "🔍 Encontrei ${searchResults.size} memória(s):"
-                }
-                
-                chatManager.saveAssistantMessage(responseText)
-            }
-        } catch (e: Exception) {
-            chatManager.saveAssistantMessage("❌ Erro ao buscar memórias.")
-        }
-    }
-
-    private suspend fun handleListMemories() {
-        try {
-            val memories = repository.getAllMemories().first()
-            
-            if (memories.isEmpty()) {
-                chatManager.saveAssistantMessage(
-                    "📝 Nenhuma memória ainda.\n\nDiga 'vou anotar isso: sua ideia' para criar a primeira!"
-                )
-            } else {
-                val sortedMemories = memories.sortedByDescending { it.createdAt }
-                _uiState.value = _uiState.value.copy(memoryResults = sortedMemories)
-                chatManager.saveAssistantMessage(
-                    "🧠 Você tem ${memories.size} memória(s) salvas:"
-                )
-            }
-        } catch (e: Exception) {
-            chatManager.saveAssistantMessage("❌ Erro ao carregar memórias.")
-        }
-    }
-
-    private suspend fun handleNormalChat() {
+    
+    /**
+     * Adiciona resposta mock para testes
+     */
+    private suspend fun addMockResponse() {
         val responses = listOf(
-            "👋 Olá! Sou o Cerevya, seu segundo cérebro digital.",
-            "💡 Diga 'vou anotar isso: minha ideia' para salvar uma memória.",
-            "🔍 Diga 'me mostra minhas ideias' para buscar memórias.",
-            "📋 Diga 'minhas memórias' para ver tudo.",
-            "🧠 Estou aqui para ajudar a organizar seus pensamentos!",
-            "💭 Pode me contar sobre suas ideias!",
-            "🎯 Como posso ajudar a organizar suas ideias?"
+            "👋 Entendi! Sua mensagem foi recebida.\n\nEsta é uma resposta de teste enquanto a IA não está integrada. Continue enviando mensagens para testar o sistema!",
+            "💬 Mensagem registrada!\n\nO sistema de chat está funcionando corretamente. Aguarde a integração com a IA para respostas mais inteligentes.",
+            "✅ Recebido! Mensagem salva com sucesso.\n\nPosso ajudar com algo mais?",
+            "🎯 Entendi sua mensagem!\n\nO sistema está funcionando em modo de testes. Aguarde a integração da IA para funcionalidades completas.",
+            "🧠 Mensagem processada!\n\nO histórico da conversa está sendo mantido corretamente."
         )
         
-        chatManager.saveAssistantMessage(responses.random())
+        chatRepository.saveAssistantMessage(responses.random())
     }
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
 
-    fun clearChat() {
-        viewModelScope.launch {
-            chatManager.clearAllMessages()
-        }
-    }
-
     override fun onCleared() {
         super.onCleared()
-        // Não limpa as mensagens aqui para manter o chat preservado
     }
 
     class Factory(
         private val repository: MemoryRepository,
-        private val chatManager: ChatManager
+        private val chatRepository: ChatRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return ChatViewModel(repository, chatManager) as T
+            return ChatViewModel(repository, chatRepository) as T
         }
     }
 }

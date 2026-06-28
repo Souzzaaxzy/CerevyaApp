@@ -4,6 +4,7 @@ import android.app.Application
 import com.cerevya.auth.FirebaseAuthManager
 import com.cerevya.cloud.CloudMemoryManager
 import com.cerevya.data.chat.ChatManager
+import com.cerevya.data.chat.ChatRepository
 import com.cerevya.data.database.CerevyaDatabase
 import com.cerevya.data.firestore.FirestoreUserManager
 import com.cerevya.data.preferences.PreferencesManager
@@ -22,8 +23,11 @@ class CerevyaApplication : Application() {
     // Firestore User Manager (única fonte de dados do usuário)
     val firestoreUserManager: FirestoreUserManager by lazy { FirestoreUserManager(this) }
     
-    // Chat Manager (Firestore)
+    // Chat Manager (Firestore) - para sincronização futura
     val chatManager: ChatManager by lazy { ChatManager(this) }
+    
+    // Chat Repository (Room) - para funcionamento local/offline
+    val chatRepository: ChatRepository by lazy { ChatRepository(this) }
     
     // Cloud and sync (prepared for when Firebase is fully configured)
     val cloudMemoryManager: CloudMemoryManager by lazy { CloudMemoryManager() }

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
@@ -34,11 +34,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.cerevya.data.database.ChatEntity
 import com.cerevya.domain.models.UserEntity
 import com.cerevya.ui.components.DrawerMenuItem
 import kotlinx.coroutines.CoroutineScope
@@ -53,9 +54,12 @@ fun NavigationDrawerContent(
     user: UserEntity?,
     userEmail: String?,
     memoryCount: Int,
+    chats: List<ChatEntity>,
+    activeChatId: String?,
     onNavigate: (String) -> Unit,
     onProfileClick: () -> Unit,
-    onNewChatClick: () -> Unit
+    onNewChatClick: () -> Unit,
+    onChatClick: (ChatEntity) -> Unit
 ) {
     ModalDrawerSheet(
         modifier = Modifier.fillMaxHeight()
@@ -98,7 +102,7 @@ fun NavigationDrawerContent(
                 )
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Folder,
+                    imageVector = Icons.Outlined.Chat,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp)
                 )
@@ -114,6 +118,32 @@ fun NavigationDrawerContent(
                 modifier = Modifier.padding(vertical = 8.dp),
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
             )
+
+            // Recent Chats Section
+            if (chats.isNotEmpty()) {
+                Text(
+                    text = "Conversas Recentes",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+                
+                chats.take(5).forEach { chat ->
+                    ChatHistoryItem(
+                        chat = chat,
+                        isActive = chat.chatId == activeChatId,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onChatClick(chat)
+                        }
+                    )
+                }
+                
+                Divider(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                )
+            }
 
             // Navigation Items (Memórias and Configurações only)
             DrawerMenuItem.entries.forEach { item ->
@@ -146,6 +176,52 @@ fun NavigationDrawerContent(
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun ChatHistoryItem(
+    chat: ChatEntity,
+    isActive: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor = if (isActive) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .background(backgroundColor)
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Chat,
+            contentDescription = null,
+            tint = if (isActive) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.outline
+            },
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = chat.title,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (isActive) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

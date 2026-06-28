@@ -97,18 +97,14 @@ fun CerevyaAppContent(
     val firestoreUser by app.firestoreUserManager.currentUser.collectAsState()
     val needsSetup by app.firestoreUserManager.needsSetup.collectAsState()
     val memoryCount by app.memoryRepository.getAllMemories().collectAsState(initial = emptyList())
-    val activeChat by app.chatManager.activeChat.collectAsState()
+    val chats by app.chatRepository.chats.collectAsState()
+    val activeChat by app.chatRepository.activeChat.collectAsState()
     
     var isSignInLoading by remember { mutableStateOf(false) }
 
-    LaunchedEffect(currentFirebaseUser) {
-        if (currentFirebaseUser != null) {
-            app.firestoreUserManager.createUserIfNotExists()
-            app.chatManager.observeChats()
-        } else {
-            app.firestoreUserManager.disconnect()
-            app.chatManager.clearMessages()
-        }
+    LaunchedEffect(Unit) {
+        // Inicializar chat repository
+        // Os chats já são carregados automaticamente pelo ChatRepository
     }
 
     BackHandler(enabled = currentRoute != Screen.Welcome.route && currentRoute != Screen.ProfileSetup.route) {
@@ -160,10 +156,7 @@ fun CerevyaAppContent(
     // Create new chat and navigate
     fun handleNewChatClick() {
         scope.launch {
-            val chat = app.chatManager.createChat()
-            chat?.let {
-                app.chatManager.setActiveChat(it.chatId)
-            }
+            app.chatRepository.createChat()
         }
     }
 
@@ -212,13 +205,21 @@ fun CerevyaAppContent(
                 user = firestoreUser,
                 userEmail = currentFirebaseUser?.email,
                 memoryCount = memoryCount.size,
+                chats = chats,
+                activeChatId = activeChat?.chatId,
                 onNavigate = { route ->
                     navigateTo(route)
                 },
                 onProfileClick = {
                     navigateTo(Screen.Profile.route)
                 },
-                onNewChatClick = { handleNewChatClick() }
+                onNewChatClick = { handleNewChatClick() },
+                onChatClick = { chat ->
+                    scope.launch {
+                        app.chatRepository.setActiveChat(chat.chatId)
+                        app.chatRepository.observeMessages(chat.chatId)
+                    }
+                }
             )
         }
     ) {
@@ -271,7 +272,7 @@ fun CerevyaAppContent(
             // Chat Screen - main screen after login
             composable(Screen.Chat.route) {
                 val chatViewModel: ChatViewModel = viewModel(
-                    factory = ChatViewModel.Factory(app.memoryRepository, app.chatManager)
+                    factory = ChatViewModel.Factory(app.memoryRepository, app.chatRepository)
                 )
                 
                 LaunchedEffect(activeChat) {

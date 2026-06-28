@@ -7,12 +7,13 @@ import androidx.room.RoomDatabase
 import com.cerevya.domain.models.MemoryEntity
 
 @Database(
-    entities = [MemoryEntity::class],
-    version = 1,
+    entities = [MemoryEntity::class, ChatEntity::class, ChatMessageEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class CerevyaDatabase : RoomDatabase() {
     abstract fun memoryDao(): MemoryDao
+    abstract fun chatDao(): ChatDao
 
     companion object {
         @Volatile
