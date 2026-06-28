@@ -14,6 +14,13 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
+// Load secrets.properties for API keys
+val secretsPropertiesFile = rootProject.file("secrets.properties")
+val secretsProperties = Properties()
+if (secretsPropertiesFile.exists()) {
+    secretsProperties.load(secretsPropertiesFile.inputStream())
+}
+
 android {
     namespace = "com.cerevya"
     compileSdk = 34
@@ -29,6 +36,9 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        
+        // Pass API key to app via BuildConfig
+        buildConfigField("String", "GROQ_API_KEY", "\"${secretsProperties["GROQ_API_KEY"] ?: ""}\"")
     }
 
     signingConfigs {
@@ -71,6 +81,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"

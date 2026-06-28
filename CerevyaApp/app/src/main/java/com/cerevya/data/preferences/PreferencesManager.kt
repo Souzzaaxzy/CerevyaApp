@@ -22,7 +22,6 @@ class PreferencesManager(context: Context) {
     companion object {
         private const val PREFS_NAME = "cerevya_prefs"
         private const val KEY_THEME_MODE = "theme_mode"
-        private const val KEY_API_KEY = "groq_api_key"
     }
     
     private val _themeMode = MutableStateFlow(getThemeMode())
@@ -36,22 +35,5 @@ class PreferencesManager(context: Context) {
     fun setThemeMode(mode: ThemeMode) {
         prefs.edit().putInt(KEY_THEME_MODE, mode.ordinal).apply()
         _themeMode.value = mode
-    }
-    
-    // API Key management
-    fun getApiKey(): String? {
-        return prefs.getString(KEY_API_KEY, null)
-    }
-    
-    fun setApiKey(apiKey: String) {
-        prefs.edit().putString(KEY_API_KEY, apiKey).apply()
-    }
-    
-    fun hasApiKey(): Boolean {
-        return getApiKey()?.isNotBlank() == true
-    }
-    
-    fun clearApiKey() {
-        prefs.edit().remove(KEY_API_KEY).apply()
     }
 }

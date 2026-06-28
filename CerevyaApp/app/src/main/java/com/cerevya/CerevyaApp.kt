@@ -34,14 +34,12 @@ class CerevyaApplication : Application() {
     // Chat Repository (Room) - para funcionamento local/offline
     val chatRepository: ChatRepository by lazy { ChatRepository(this) }
     
-    // AI Service - Groq API
+    // AI Service - Groq API (API Key via BuildConfig - secrets.properties)
     val aiService: AIService by lazy {
-        // Chave da API Groq - Em produção, usar variáveis de ambiente ou secrets seguros
-        val apiKey = preferencesManager.getApiKey() ?: ""
         val config = AIConfig(
             provider = AIProvider.GROQ,
             model = AIModel.LLAMA_3_3_70B,
-            apiKey = apiKey,
+            apiKey = BuildConfig.GROQ_API_KEY,
             baseUrl = "https://api.groq.com/openai/v1",
             maxTokens = 4096,
             temperature = 0.7f,
