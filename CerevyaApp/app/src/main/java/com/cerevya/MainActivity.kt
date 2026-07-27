@@ -54,13 +54,20 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         
         val webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
-        val googleSignInClient = GoogleSignIn.getClient(
-            this,
-            GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken(webClientId)
-                .requestEmail()
-                .build()
-        )
+        
+        // Criar GoogleSignInClient apenas se o ID estiver configurado
+        val googleSignInClient = if (webClientId.isNotBlank()) {
+            GoogleSignIn.getClient(
+                this,
+                GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                    .requestIdToken(webClientId)
+                    .requestEmail()
+                    .build()
+            )
+        } else {
+            Log.e("MainActivity", "GOOGLE_WEB_CLIENT_ID não está configurado!")
+            null
+        }
         
         setContent {
             CerevyaTheme {
@@ -79,7 +86,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun CerevyaAppContent(
-    googleSignInClient: com.google.android.gms.auth.api.signin.GoogleSignInClient
+    googleSignInClient: com.google.android.gms.auth.api.signin.GoogleSignInClient?
 ) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -244,8 +251,18 @@ fun CerevyaAppContent(
                 WelcomeScreen(
                     isLoading = isSignInLoading,
                     onSignInClick = {
+                        val client = googleSignInClient
+                        if (client == null) {
+                            isSignInLoading = false
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Google Sign-In não está configurado. Configure GOOGLE_WEB_CLIENT_ID no secrets.properties",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            return@WelcomeScreen
+                        }
                         isSignInLoading = true
-                        signInLauncher.launch(googleSignInClient.signInIntent)
+                        signInLauncher.launch(client.signInIntent)
                     }
                 )
             }
