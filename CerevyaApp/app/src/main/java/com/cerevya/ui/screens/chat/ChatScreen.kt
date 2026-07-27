@@ -104,62 +104,65 @@ fun ChatScreen(
             modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
         )
 
-        // Messages list or welcome screen
-        if (uiState.messages.isEmpty() && !uiState.isAIThinking && !uiState.isAIResponding) {
-            // Welcome screen when no messages
-            WelcomeScreen()
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                state = listState,
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                items(
-                    items = uiState.messages,
-                    key = { it.messageId }
-                ) { message ->
-                    MessageBubble(message = message)
-                }
-                
-                // AI Thinking indicator
-                if (uiState.isAIThinking) {
-                    item {
-                        AIThinkingIndicator()
+        // Content area with messages or welcome screen
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
+            if (uiState.messages.isEmpty() && !uiState.isAIThinking && !uiState.isAIResponding) {
+                // Welcome screen when no messages
+                WelcomeScreen()
+            } else {
+                LazyColumn(
+                    state = listState,
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    items(
+                        items = uiState.messages,
+                        key = { it.messageId }
+                    ) { message ->
+                        MessageBubble(message = message)
                     }
-                }
-                
-                // AI Responding with partial content
-                if (uiState.isAIResponding && uiState.aiPartialResponse.isNotEmpty()) {
-                    item {
-                        AIPartialResponse(content = uiState.aiPartialResponse)
+                    
+                    // AI Thinking indicator
+                    if (uiState.isAIThinking) {
+                        item {
+                            AIThinkingIndicator()
+                        }
                     }
-                }
-                
-                // Error or No Internet state
-                if (uiState.error != null || uiState.noInternet) {
-                    item {
-                        ErrorStateCard(
-                            message = uiState.error ?: "Sem conexão com a internet",
-                            showRetry = uiState.showRetryButton,
-                            onRetry = { viewModel.retry() }
-                        )
+                    
+                    // AI Responding with partial content
+                    if (uiState.isAIResponding && uiState.aiPartialResponse.isNotEmpty()) {
+                        item {
+                            AIPartialResponse(content = uiState.aiPartialResponse)
+                        }
                     }
-                }
-                
-                // Memory results
-                if (uiState.memoryResults.isNotEmpty()) {
-                    item {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            uiState.memoryResults.forEach { memory ->
-                                MemoryPreviewCard(
-                                    memory = memory,
-                                    onClick = { onMemoryClick(memory.id) }
-                                )
+                    
+                    // Error or No Internet state
+                    if (uiState.error != null || uiState.noInternet) {
+                        item {
+                            ErrorStateCard(
+                                message = uiState.error ?: "Sem conexão com a internet",
+                                showRetry = uiState.showRetryButton,
+                                onRetry = { viewModel.retry() }
+                            )
+                        }
+                    }
+                    
+                    // Memory results
+                    if (uiState.memoryResults.isNotEmpty()) {
+                        item {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                uiState.memoryResults.forEach { memory ->
+                                    MemoryPreviewCard(
+                                        memory = memory,
+                                        onClick = { onMemoryClick(memory.id) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -167,7 +170,7 @@ fun ChatScreen(
             }
         }
 
-        // Chat input - disabled while AI is processing
+        // Chat input - always visible at bottom
         com.cerevya.ui.components.chat.ChatInput(
             text = uiState.inputText,
             onTextChange = viewModel::updateInputText,
