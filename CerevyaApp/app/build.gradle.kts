@@ -14,11 +14,23 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
-// Load secrets.properties for API keys
-val secretsPropertiesFile = rootProject.file("secrets.properties")
-val secretsProperties = Properties()
-if (secretsPropertiesFile.exists()) {
-    secretsProperties.load(secretsPropertiesFile.inputStream())
+// Load secrets from environment variables (GitHub Actions) or local file
+val groqApiKey = System.getenv("GROQ_API_KEY") ?: run {
+    val secretsFile = rootProject.file("secrets.properties")
+    if (secretsFile.exists()) {
+        val props = Properties()
+        props.load(secretsFile.inputStream())
+        props.getProperty("GROQ_API_KEY", "")
+    } else ""
+}
+
+val googleWebClientId = System.getenv("GOOGLE_WEB_CLIENT_ID") ?: run {
+    val secretsFile = rootProject.file("secrets.properties")
+    if (secretsFile.exists()) {
+        val props = Properties()
+        props.load(secretsFile.inputStream())
+        props.getProperty("GOOGLE_WEB_CLIENT_ID", "")
+    } else ""
 }
 
 android {
@@ -37,9 +49,9 @@ android {
             useSupportLibrary = true
         }
         
-        // Pass API key to app via BuildConfig
-        buildConfigField("String", "GROQ_API_KEY", "\"${secretsProperties["GROQ_API_KEY"] ?: ""}\"")
-        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${secretsProperties["GOOGLE_WEB_CLIENT_ID"] ?: ""}\"")
+        // Pass API keys to app via BuildConfig
+        buildConfigField("String", "GROQ_API_KEY", "\"$groqApiKey\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
     }
 
     signingConfigs {

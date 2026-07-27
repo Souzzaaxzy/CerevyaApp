@@ -27,6 +27,7 @@ jobs:
       - name: Create Secrets
         run: |
           echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" > CerevyaApp/secrets.properties
+          echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> CerevyaApp/secrets.properties
 
       - name: Create Keystore
         run: |
