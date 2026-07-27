@@ -8,4 +8,3 @@ local.properties
 .DS_Store
 *.keystore.jks
 keystore.properties
-secrets.properties
