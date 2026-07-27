@@ -15,23 +15,8 @@ if (keystorePropertiesFile.exists()) {
 }
 
 // Load secrets from environment variables (GitHub Actions) or local file
-val groqApiKey = System.getenv("GROQ_API_KEY") ?: run {
-    val secretsFile = rootProject.file("secrets.properties")
-    if (secretsFile.exists()) {
-        val props = Properties()
-        props.load(secretsFile.inputStream())
-        props.getProperty("GROQ_API_KEY", "")
-    } else ""
-}
-
-val googleWebClientId = System.getenv("GOOGLE_WEB_CLIENT_ID") ?: run {
-    val secretsFile = rootProject.file("secrets.properties")
-    if (secretsFile.exists()) {
-        val props = Properties()
-        props.load(secretsFile.inputStream())
-        props.getProperty("GOOGLE_WEB_CLIENT_ID", "")
-    } else ""
-}
+val groqApiKey: String = System.getenv("GROQ_API_KEY") ?: ""
+val googleWebClientId: String = System.getenv("GOOGLE_WEB_CLIENT_ID") ?: ""
 
 android {
     namespace = "com.cerevya"
