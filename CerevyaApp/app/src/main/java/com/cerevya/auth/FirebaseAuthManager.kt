@@ -35,18 +35,12 @@ class FirebaseAuthManager(context: Context) {
     
     private val firebaseAuth = FirebaseAuth.getInstance()
     
-    private val googleSignInClient: GoogleSignInClient? by lazy {
-        val webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
-        if (webClientId.isBlank()) {
-            Log.e(TAG, "GOOGLE_WEB_CLIENT_ID não está configurado! Crie o arquivo secrets.properties com a chave correta.")
-            null
-        } else {
-            val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken(webClientId)
-                .requestEmail()
-                .build()
-            GoogleSignIn.getClient(context, gso)
-        }
+    private val googleSignInClient: GoogleSignInClient by lazy {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(BuildConfig.GOOGLE_WEB_CLIENT_ID)
+            .requestEmail()
+            .build()
+        GoogleSignIn.getClient(context, gso)
     }
     
     init {
@@ -138,15 +132,9 @@ class FirebaseAuthManager(context: Context) {
             // Já logado com Google, autenticar no Firebase
             firebaseAuthWithGoogle(signInAccount.idToken!!, onComplete)
         } else {
-            // Verificar se o Google Sign-In está configurado
-            val client = googleSignInClient
-            if (client == null) {
-                onComplete(Result.failure(Exception("Google Sign-In não está configurado. Configure GOOGLE_WEB_CLIENT_ID no secrets.properties")))
-                return
-            }
             // Iniciar novo fluxo de sign-in
             activity.startActivityForResult(
-                client.signInIntent,
+                googleSignInClient.signInIntent,
                 RC_SIGN_IN
             )
             // O resultado será tratado via ActivityResultLauncher no componente chamador
@@ -215,19 +203,14 @@ class FirebaseAuthManager(context: Context) {
      * Realiza logout
      */
     fun signOut() {
-        // Sign out do Google (se configurado)
-        googleSignInClient?.signOut()
-            ?.addOnCompleteListener {
+        // Sign out do Google
+        googleSignInClient.signOut()
+            .addOnCompleteListener {
                 // Sign out do Firebase
                 firebaseAuth.signOut()
                 clearSession()
                 Log.d(TAG, "User signed out")
-            } ?: run {
-            // Se Google Sign-In não estiver configurado, apenas fazer sign out do Firebase
-            firebaseAuth.signOut()
-            clearSession()
-            Log.d(TAG, "User signed out (Firebase only)")
-        }
+            }
     }
     
     /**
