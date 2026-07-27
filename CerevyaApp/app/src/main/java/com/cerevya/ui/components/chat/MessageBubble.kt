@@ -25,7 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.cerevya.data.chat.MessageEntity
-import com.cerevya.data.chat.MessageRole
+import com.cerevya.domain.models.ChatMessageRole
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -35,7 +35,7 @@ fun MessageBubble(
     message: MessageEntity,
     modifier: Modifier = Modifier
 ) {
-    val isUser = message.role == MessageRole.USER
+    val isUser = message.role == ChatMessageRole.USER
     val alignment = if (isUser) Alignment.End else Alignment.Start
     val bubbleColor = if (isUser) {
         MaterialTheme.colorScheme.primary

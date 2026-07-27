@@ -5,6 +5,7 @@ import com.cerevya.data.database.ChatDao
 import com.cerevya.data.database.ChatEntity
 import com.cerevya.data.database.ChatMessageEntity
 import com.cerevya.data.database.CerevyaDatabase
+import com.cerevya.domain.models.ChatMessageRole
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -123,7 +124,7 @@ class ChatRepository(context: Context) {
             messageId = messageId,
             chatId = chat.chatId,
             text = text,
-            role = MessageRole.USER.name,
+            role = ChatMessageRole.USER.name,
             timestamp = now,
             userName = userName,
             userPhotoUrl = ""
@@ -154,7 +155,7 @@ class ChatRepository(context: Context) {
             messageId = messageId,
             chatId = chat.chatId,
             text = text,
-            role = MessageRole.ASSISTANT.name,
+            role = ChatMessageRole.ASSISTANT.name,
             timestamp = now,
             userName = "Cerevya",
             userPhotoUrl = ""
@@ -200,7 +201,11 @@ class ChatRepository(context: Context) {
             chatId = this.chatId,
             uid = "",
             text = this.text,
-            role = MessageRole.valueOf(this.role),
+            role = try {
+                ChatMessageRole.valueOf(this.role)
+            } catch (e: Exception) {
+                ChatMessageRole.USER
+            },
             timestamp = this.timestamp,
             userName = this.userName,
             userPhotoUrl = this.userPhotoUrl

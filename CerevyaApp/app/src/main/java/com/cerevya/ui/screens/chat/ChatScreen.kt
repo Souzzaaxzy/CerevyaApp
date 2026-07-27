@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.cerevya.domain.models.ChatMessageRole
 import com.cerevya.ui.components.chat.MessageBubble
 import com.cerevya.ui.components.MemoryPreviewCard
 import com.cerevya.viewmodel.ChatViewModel
@@ -261,7 +262,7 @@ private fun AIPartialResponse(content: String) {
             chatId = "",
             uid = "",
             text = content,
-            role = com.cerevya.data.chat.MessageRole.ASSISTANT,
+            role = ChatMessageRole.ASSISTANT,
             timestamp = System.currentTimeMillis(),
             userName = "Cerevya",
             userPhotoUrl = ""

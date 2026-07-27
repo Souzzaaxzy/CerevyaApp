@@ -1,6 +1,7 @@
 package com.cerevya.ai
 
 import com.cerevya.data.chat.ChatRepository
+import com.cerevya.domain.models.ChatMessageRole
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -47,14 +48,14 @@ class AIChatManager(
             // Obter contexto completo da conversa
             val conversationHistory = chatRepository.messages.value.map { msg ->
                 AIMessage(
-                    role = if (msg.role.name == "USER") MessageRole.USER else MessageRole.ASSISTANT,
+                    role = if (msg.role == ChatMessageRole.USER) ChatMessageRole.USER else ChatMessageRole.ASSISTANT,
                     content = msg.text
                 )
             }
             
             // Adicionar mensagem do usuário
             val allMessages = conversationHistory + AIMessage(
-                role = MessageRole.USER,
+                role = ChatMessageRole.USER,
                 content = userMessage
             )
             

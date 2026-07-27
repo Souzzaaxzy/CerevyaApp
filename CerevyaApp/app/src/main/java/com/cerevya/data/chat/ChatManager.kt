@@ -1,6 +1,7 @@
 package com.cerevya.data.chat
 
 import android.content.Context
+import com.cerevya.domain.models.ChatMessageRole
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -317,7 +318,7 @@ class ChatManager(private val context: Context) {
                 chatId = chat.chatId,
                 uid = user.uid,
                 text = text.trim(),
-                role = MessageRole.USER,
+                role = ChatMessageRole.USER,
                 timestamp = System.currentTimeMillis(),
                 userName = user.displayName ?: "Usuário",
                 userPhotoUrl = user.photoUrl?.toString() ?: ""
@@ -364,7 +365,7 @@ class ChatManager(private val context: Context) {
                 chatId = chat.chatId,
                 uid = user.uid,
                 text = text,
-                role = MessageRole.ASSISTANT,
+                role = ChatMessageRole.ASSISTANT,
                 timestamp = System.currentTimeMillis(),
                 userName = "Cerevya",
                 userPhotoUrl = ""

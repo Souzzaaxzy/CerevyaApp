@@ -24,7 +24,7 @@ object MemorySummarizer {
         "ali", "lá", "dentro", "fora", "cima", "baixo", "longe", "perto",
         "hoje", "amanhã", "ontem", "sempre", "nunca", "talvez", "pode",
         "deve", "quer", "vai", "vou", "tem", "têm", "há", "era", "foi",
-        "ser", "estar", "ficar", "tornar", "jadi", "tenho", "tenha"
+        "ser", "estar", "ficar", "tornar", "tenho", "tenha"
     )
 
     private val importantPrefixes = listOf(

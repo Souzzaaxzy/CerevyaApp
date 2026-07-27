@@ -39,6 +39,7 @@ android {
         
         // Pass API key to app via BuildConfig
         buildConfigField("String", "GROQ_API_KEY", "\"${secretsProperties["GROQ_API_KEY"] ?: ""}\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${secretsProperties["GOOGLE_WEB_CLIENT_ID"] ?: ""}\"")
     }
 
     signingConfigs {

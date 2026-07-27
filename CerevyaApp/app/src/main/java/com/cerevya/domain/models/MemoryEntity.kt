@@ -1,10 +1,18 @@
 package com.cerevya.domain.models
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.util.UUID
 
-@Entity(tableName = "memories")
+@Entity(
+    tableName = "memories",
+    indices = [
+        Index(value = ["createdAt"]),
+        Index(value = ["category"]),
+        Index(value = ["favorite"])
+    ]
+)
 data class MemoryEntity(
     @PrimaryKey
     val id: String = UUID.randomUUID().toString(),

@@ -25,7 +25,9 @@ abstract class CerevyaDatabase : RoomDatabase() {
                     context.applicationContext,
                     CerevyaDatabase::class.java,
                     "cerevya_database"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }

@@ -165,9 +165,11 @@ class AIService(private var config: AIConfig) {
         return text
             .replace("\\", "\\\\")
             .replace("\"", "\\\"")
+            .replace("'", "\\'")
             .replace("\n", "\\n")
             .replace("\r", "\\r")
             .replace("\t", "\\t")
+            .replace("\u0000", "\\u0000")
     }
 }
 

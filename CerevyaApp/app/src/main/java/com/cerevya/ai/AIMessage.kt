@@ -1,19 +1,12 @@
 package com.cerevya.ai
 
-/**
- * Papel da mensagem na conversa
- */
-enum class MessageRole {
-    SYSTEM,
-    USER,
-    ASSISTANT
-}
+import com.cerevya.domain.models.ChatMessageRole
 
 /**
  * Mensagem trocada com a IA
  */
 data class AIMessage(
-    val role: MessageRole,
+    val role: ChatMessageRole,
     val content: String
 )
 

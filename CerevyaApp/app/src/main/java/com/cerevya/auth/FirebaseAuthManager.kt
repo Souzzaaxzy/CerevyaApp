@@ -254,7 +254,7 @@ class FirebaseAuthManager(context: Context) {
         private const val KEY_LAST_SYNC = "last_sync"
         private const val RC_SIGN_IN = 9001
         
-        // Web Client ID do google-services.json (client_type: 3)
-        private const val WEB_CLIENT_ID = "197213311795-9bh76pjnq9pgh69k6ffphvkps6goq3ck.apps.googleusercontent.com"
+        // Web Client ID is now loaded from BuildConfig
+        // This is set via secrets.properties and BuildConfig.GOOGLE_WEB_CLIENT_ID
     }
 }

@@ -1,34 +1,22 @@
 package com.cerevya.data.chat
 
+import com.cerevya.domain.models.ChatMessageRole
+
 /**
  * MessageEntity - Modelo de mensagem para o chat
  * 
  * Estrutura Firestore: chats/{chatId}/messages/{messageId}
- * 
- * Roles:
- * - user: Mensagem enviada pelo usuário
- * - assistant: Mensagem recebida da IA (futuro)
- * - system: Mensagem do sistema
  */
 data class MessageEntity(
     val messageId: String = "",
     val chatId: String = "",
     val uid: String = "",
     val text: String = "",
-    val role: MessageRole = MessageRole.USER,
+    val role: ChatMessageRole = ChatMessageRole.USER,
     val timestamp: Long = System.currentTimeMillis(),
     val userName: String = "",
     val userPhotoUrl: String = ""
 )
-
-/**
- * Roles possíveis para mensagens
- */
-enum class MessageRole {
-    USER,       // Mensagem do usuário
-    ASSISTANT,  // Mensagem da IA (futuro)
-    SYSTEM      // Mensagem do sistema
-}
 
 /**
  * Extension para converter de/para Map (Firestore)
@@ -51,9 +39,9 @@ fun Map<String, Any?>.toMessageEntity(): MessageEntity {
         uid = this["uid"] as? String ?: "",
         text = this["text"] as? String ?: "",
         role = try {
-            MessageRole.valueOf(this["role"] as? String ?: "USER")
+            ChatMessageRole.valueOf(this["role"] as? String ?: "USER")
         } catch (e: Exception) {
-            MessageRole.USER
+            ChatMessageRole.USER
         },
         timestamp = this["timestamp"] as? Long ?: System.currentTimeMillis(),
         userName = this["userName"] as? String ?: "",
