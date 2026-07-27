@@ -1,6 +1,7 @@
 package com.cerevya
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import com.cerevya.BuildConfig
 import androidx.activity.ComponentActivity
@@ -248,6 +249,7 @@ fun CerevyaAppContent(
             }
 
             composable(Screen.Welcome.route) {
+                val context = LocalContext.current
                 WelcomeScreen(
                     isLoading = isSignInLoading,
                     onSignInClick = {
@@ -255,7 +257,7 @@ fun CerevyaAppContent(
                         if (client == null) {
                             isSignInLoading = false
                             Toast.makeText(
-                                this@MainActivity,
+                                context,
                                 "Google Sign-In não está configurado. Configure GOOGLE_WEB_CLIENT_ID no secrets.properties",
                                 Toast.LENGTH_LONG
                             ).show()
