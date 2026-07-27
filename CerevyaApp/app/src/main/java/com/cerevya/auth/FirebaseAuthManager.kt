@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
+import com.cerevya.BuildConfig
 import com.cerevya.domain.models.UserEntity
 import com.cerevya.domain.models.UserSession
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -36,7 +37,7 @@ class FirebaseAuthManager(context: Context) {
     
     private val googleSignInClient: GoogleSignInClient by lazy {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(WEB_CLIENT_ID)
+            .requestIdToken(BuildConfig.GOOGLE_WEB_CLIENT_ID)
             .requestEmail()
             .build()
         GoogleSignIn.getClient(context, gso)
